@@ -18,26 +18,7 @@
 #----------------------------------------------------------------------
 from .expr import Wire
 from .expr import Reg
-def gen_xml(vs,hist=None):
-    if hist==None:
-        hist = []
-    lines = []
-    lines.append('<vstruct name="'+str(vs._name)+'">')
-    for key,val in vs.__dict__.items():
-        if key[0]=='_':
-            continue
-        for other in hist:
-            if other is val:
-                print(lines)
-                raise RuntimeError(key)
-        if isinstance(val,(VStruct,Wire)):
-            hist.append(val)
-            if isinstance(val,Wire):
-                lines.append('<'+str(val.typename)+' name="'+str(val)+'" io='+str(val.io)+'/>')
-            else:
-                lines.append(gen_xml(val,hist=hist))
-    lines.append('</ vstruct>')
-    return '\n'.join(lines)
+from .naming import NamingNode
 def parse_object(obj_str,width=None,io=None):
     parts = obj_str.split('.')
     if len(parts)==1:
@@ -136,16 +117,16 @@ def set_components(obj,components,io=None):
                 setattr(obj,name,subobj)
                 return [subobj]
             elif isinstance(components[1],(dict,list)):
-                subobj = VStruct(components[1],name=name,io=io)
+                subobj = VStruct(components[1],name=name,io=io,bypass=False)
                 setattr(obj,name,subobj)
                 return [subobj]
         elif isinstance(components[2],int):
             if isinstance(components[1],tuple):
-                subobj = VStruct([(name+'_%d'%i,*components[1]) for i in range(components[2])],name='',io=io,bypass=True)
+                subobj = VStruct([(name+'_%d'%i,*components[1]) for i in range(components[2])],name=name,io=io,bypass=True)
                 setattr(obj,name,subobj)
                 return [subobj]
             else:
-                subobj = VStruct([(name+'_%d'%i,components[1]) for i in range(components[2])],name='',io=io,bypass=True)
+                subobj = VStruct([(name+'_%d'%i,components[1]) for i in range(components[2])],name=name,io=io,bypass=True)
                 setattr(obj,name,subobj)
                 return [subobj]
         if len(components)==2:
@@ -160,53 +141,13 @@ def set_components(obj,components,io=None):
         return [subobj]
     raise TypeError(type(components))
 
-class VStruct:
-    @property
-    def name(self):
-        _name = self._name
-        if self.bypass:
-            _name = None
-        if self._scope==None:
-            return _name
-        name = self._scope.name
-        if name==None:
-            return _name
-        if _name==None:
-            return name
-        return name+'_'+_name
-    def __setattr__(self,key,val):
-        if val is self:
-            raise RuntimeError()
-        object.__setattr__(self,key,val)
-    def __init__(self,components=[],name=None,io=None,bypass=False):
-        self._name = name
-        self._scope = None
-        self.bypass = bypass
+class VStruct(NamingNode):
+    def __init__(self,components=[],io=None,name=None,reverse=False,bypass=False):
+        NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass)
         sublist = set_components(self,components,io=io)
-        for c in sublist:
-            if c is self:
-                raise RuntimeError()
-        self.__list = sublist
-        for key,val in self.__dict__.items():
-            if key[0] =='_':
-                continue
-            if isinstance(val,(Wire,VStruct)):
-                val._scope = self
     def __delitem__(self,key):
-        del self.__list[key]
+        del self._childs[key]
     def __setitem__(self,key,val):
-        self.__list[key] = val
+        self._childs[key] = val
     def __getitem__(self,key):
-        return self.__list[key]
-    def __iter__(self):
-        for key,val in self.__dict__.items():
-            if key[0]=='_':
-                continue
-            if isinstance(val,VStruct):
-                for subval in val:
-                    yield subval
-            elif isinstance(val,Wire):
-                yield val
-        return
-    def gen__xml(self):
-        return gen_xml(self)
+        return self._childs[key]

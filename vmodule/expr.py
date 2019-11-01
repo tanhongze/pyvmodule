@@ -19,8 +19,8 @@
 from .ast import ASTNode
 from .check import VChecker
 from .calculations import actions as calc_actions
-from .codegen import CodeGen
-precedences = CodeGen.precedences
+from .language.common import precedences
+from .naming import NamingNode
 import warnings
 __all__ = ['Wire','Reg','Mux','Concatenate','BitReduce','Reduce','Hexadecimal','Decimal','Octal','Binary','Always','Initial','AlwaysDelay','When','ASTNode','Expr','ControlBlock','Index']
 cols__split_line = 80
@@ -563,7 +563,8 @@ class Replicate(Expr):
         width__calculate(self)
     def __str__(self):
         return '{%d{%s}}'%(int(self.rhs),str(self.lhs))
-class Wire(Expr):
+class Wire(Expr,NamingNode):
+    random_init = False
     def receive__args(self,args,width,expr):
         if len(args)>1:
             raise KeyError('Too many arguments.')
@@ -586,15 +587,14 @@ class Wire(Expr):
         if width==None:
             width = 1
         return width,expr
+    def __str__(self):
+        return self.name
     def set__default(self,typename):
         self.comments = []
-        self.parents = []
         self.assignments = []
-        self.value = None
         self.typename = typename
-    @property
-    def childs(self):
-        return []
+        self.used = set()
+        self.parents = []
     def compute(self):
         value = 0
         masks = 0
@@ -612,43 +612,27 @@ class Wire(Expr):
         if masks+1!=(1<<len(self)):
             warnings.warn('Missing assignments')
         return value
-    @property
-    def name(self):
-        if self._name==None:
-            self._name = 'T_%d'%ASTNode.global_object_id
-            ASTNode.global_object_id += 1
-            warnings.warn('Missing name, auto-fixed.')
-        if self._scope!=None:
-            name = self._scope.name
-        else:
-            name = None
-        
-        if name == None or name == '':
-            name = self._name
-        else:
-            name = name + '_' + self._name
-        return VChecker.identifier(name)
-    def __init__(self,*args,width=None,length=1,name=None,io=None,expr=None,wire_type='wire',**pragmas):
+    def __init__(self,*args,width=None,length=1,name=None,io=None,expr=None,reverse=False,bypass=False,wire_type='wire',**pragmas):
         self.set__default(wire_type)
-        self._name = VChecker.identifier(name)
-        self._scope = None
+        NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass)
+        VChecker.identifier(self.name)
         self.io = VChecker.port(io,length,wire_type)
         width,expr = self.receive__args(args,width,expr)
         self.width,self.length = VChecker.shape(width,length)
+        self.value = None
+        if self.length>1:
+            self.value = [None for i in range(self.length)]
         self.pragmas = pragmas
         if expr!=None:
             self[:] = expr
-        if self.length>1:
-            self.value = [None for i in range(self.length)]
     def __int__(self):
-        if self.value!=None and self.length==1:
-            return self.value
+        if self.length==1:
+            if self.value!=None:
+                return self.value
+            if self.random_init:
+                self.value = random.randint(1<<len(self))
+                return self.value
         raise NotImplementedError('Not initialized.')
-    def __str__(self):
-        return self.name
-    @property
-    def assigned(self):
-        return len(self.assignments)>0
     def decorate__subscript(self,key,val=None):
         if isinstance(key,slice):
             key = Index(key,self)
@@ -746,8 +730,6 @@ class Wire(Expr):
         self.assignments.append((key,val))
     def copy(self):
         return Wire(width=self.width,length=self.length,io=self.io)
-    def __hash__(self):
-        return str.__hash__(self.name) + self.width + self.length +str.__hash__(self.io)
     def __eq__(self,other):
         return self is other
 def Reg(*args,**kwargs):
@@ -801,6 +783,24 @@ class ConstExpr(Expr):
         self.cut__off()
         if radix not in {2,8,10,16}:
             raise ValueError('Invalid radix.')
+    def __getitem__(self,key):
+        if isinstance(key,slice):
+            val = 0
+            if key.step!=1:
+                for i in range(key.start,key.stop,key.step):
+                    val<<=1
+                    val|=(self.value>>i)&1
+            else:
+                val = (self.value>>self.start)&((1<<self.stop)-1)
+            return val
+        key = wrap_expr(key)
+        if isinstance(key,ConstExpr):
+            return (self.value>>int(key))&1
+        if isinstance(key,Expr):
+            expr = 0
+            for i in range(1<<len(key)):
+                expr|=key//i
+            return expr
     def __str__(self):
         if self.value==None:
             return "{%d{1'bz}}"%len(self)

@@ -35,18 +35,17 @@ class CounterConstructor:
         self.width = width
         self.valid = valid
         self.name = 'counter_%d'%width+('_valid')
-    def add_one(self,cnt_next,cnt):
-        cnt_next[:] = cnt+1
+    def add_one(self,value):
+        return Wire(value+1)
     def implement(self):
         class Counter(VModule):
             name = self.name
             comments.append('example002 -- a simple counter.')
             clock = Wire(io='input')
             reset = Wire(io='input')
-            cnt = Reg(self.width,io='output')
-            cnt_next = Wire(self.width)
-            self.add_one(cnt_next,cnt)
-            
+            cnt = Reg(self.width)
+            cnt.next = self.add_one(cnt)
+            cnt.io='output'
             if self.valid:
                 valid = Wire(io='input')
                 valid.comments.append('Enable signal for counter.')

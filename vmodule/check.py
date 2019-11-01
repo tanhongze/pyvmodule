@@ -57,7 +57,7 @@ class VChecker:
                 continue
             if c=='_':
                 if name[i+1]=='_':
-                    raise KeyError('"_" must not be consecutive.')
+                    raise KeyError('"_" must not be consecutive for name "%s".'%name)
                 continue
             raise KeyError('Invalid character "%s"'%c)
         if name in VChecker.verilog_keywords:

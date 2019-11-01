@@ -17,9 +17,9 @@
 #along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #----------------------------------------------------------------------
 from .codegen import *
-from .expr import *
-from .vmodule import VModule
-from .check import VChecker
+from vmodule.expr import *
+from vmodule.vmodule import VModule
+from vmodule.check import VChecker
 import warnings
 from typing import List
 class VerilogGen(CodeGen):
@@ -44,9 +44,6 @@ class VerilogGen(CodeGen):
         return lines
     def __init__(self):
         self.remap_mul_cat = True
-    @property
-    def name(self):
-        return self.module.name
     def gen(self,obj:'VModuleMeta'):
         self.module = obj
         self.extract()
@@ -93,8 +90,8 @@ class VerilogGen(CodeGen):
         return code_mat
     def gen_head(self)->List[str]:
         if len(self.ports)<=0:
-            return ['module %s();'%self.name]
-        lines = ['module %s('%self.name]
+            return ['module %s();'%self.module.name]
+        lines = ['module %s('%self.module.name]
         code_mat = self.gen_decl_code_mat(self.ports,indent=1)
         rows = len(code_mat)
         for i in range(rows-1):
@@ -217,20 +214,20 @@ class VerilogGen(CodeGen):
                 lines.extend(self.gen_cblk(val,obj[key]))
         return lines
     def gen_tail(self)->List[str]:
-        return ['endmodule // '+self.name]
+        return ['endmodule // '+self.module.name]
     def receive_object(self,obj):
         if not isinstance(obj,(VModule,Wire)):
             return None,False
         name = obj.name.lower()
-        if name in self.names:
-            pre = self.names[name]
+        if name in self.module.names:
+            pre = self.module.names[name]
             if obj is pre:
                 return name,False
             if pre.name!=obj.name:
                 raise RuntimeError('"%s" and "%s" are too similar.'%(pre.name,obj.name))
             else:
                 raise RuntimeError('Redefined %s "%s".'%(obj.typename,obj.name))
-        self.names[name] = obj
+        self.module.names[name] = obj
         return name,True
     def extract_decl(self,val):
         if val.io!=None:
@@ -258,7 +255,7 @@ class VerilogGen(CodeGen):
         if isinstance(val,Wire):
             self.extract_decl(val)
             self.extract_stmt(val)
-            if val.assigned or val.io=='input':
+            if len(val.assignments)>0 or val.io=='input':
                 self.connected.add(name)
         elif isinstance(val,VModule):
             self.modules.append(val)
@@ -272,7 +269,7 @@ class VerilogGen(CodeGen):
                 if p.io in {'inout','output'}:
                     self.connected.add(attr.name.lower())
     def extract(self):
-        self.names = {}
+        self.module.names = {}
         self.wires = []
         self.rams = []
         self.modules = []
@@ -347,9 +344,9 @@ class VerilogGen(CodeGen):
         cond = self.gen_braket('?:',obj.cond,indent)
         lhs = self.gen_braket('?:',obj.lhs,indent+1)
         self.append_inline(contents,cond)
-        self.append_inline(contents,'?')
+        self.append_inline(contents,' ? ')
         self.append_inline(contents,lhs)
-        self.append_inline(contents,':')
+        self.append_inline(contents,' : ')
         return contents
     def gen_expr(self,obj:Expr,indent=0)->List[List[str]]:
         def is_long(*args):
@@ -547,4 +544,3 @@ class VerilogGen(CodeGen):
             comments.clear()
             io_infos.clear()
         return lines
-code_generators['verilog'] = VerilogGen

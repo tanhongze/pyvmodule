@@ -16,79 +16,18 @@
 #You should have received a copy of the GNU General Public License
 #along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #----------------------------------------------------------------------
-__all__ = ['VModule']
+__all__ = ['VModule','VModuleMeta']
 from .expr import *
 from .ast import ASTNode
 from .check import VChecker
-from .codegen import code_generators
+from .naming import NamingDict
+from .naming import NamingRoot
+from .naming import NamingNode
+from .language.codegen import code_generators
 from .vstruct import set_components
 from .vstruct import VStruct
 import warnings
-
-def meta_check_item(thedict,key,val):
-    if key in VModuleMetaDict.keywords:
-        if key in VModuleMetaDict.read_only_objects:
-            if key in thedict:
-                raise KeyError('Cannot overwrites built-in object "%s".'%key)
-        elif key in {'_name'}:
-            if val!=None and not isinstance(val,str):
-                raise TypeError('name should be a "str".')
-        elif key in {'ip_only'}:
-            if not isinstance(val,bool):
-                raise TypeError('"%s" should be a "bool".'%key)
-    elif key in thedict:
-        other = thedict[key]
-        if isinstance(other,ASTNode) and other.typename in {'wire','reg','module'}:
-            if other.name == key:
-                raise KeyError('Redefining %s object "%s".'%(other.typename,key))
-def meta_set_more_attr(obj,key,val):
-    if isinstance(val,ASTNode):
-        if val.typename in {'wire','reg','module'}:
-            if val._name == None:
-                val._name = VChecker.identifier(key)
-            val_name = val.name
-            if val_name != key:
-                if hasattr(obj,val_name):
-                    if not getattr(obj,val_name) is val:
-                        if isinstance(val,Wire):
-                            raise KeyError('Redefined wire "%s".'%val_name)
-                        else:
-                            warnings.warn('Wire "%s" within "%s" masked %s variable.'%(val_name,key,type(getattr(obj,val_name))))
-                type.__setattr__(obj,val_name,val)
-    elif isinstance(val,list):
-        for subval in val:
-            meta_set_more_attr(obj,key,subval)
-    elif isinstance(val,VStruct):
-        if val._name == None:
-            val._name = key
-        for subval in val:
-            meta_set_more_attr(obj,key,subval)
-def meta_set_more_item(thedict,key,val):
-    if isinstance(val,ASTNode):
-        if val.typename in {'wire','reg','module'}:
-            if val._name == None:
-                val._name = VChecker.identifier(key)
-            val_name = val.name
-            if val_name != key:
-                if val_name in thedict:
-                    if not thedict[val_name] is val:
-                        if isinstance(val,Wire):
-                            raise KeyError('Redefined wire "%s".'%val_name)
-                        else:
-                            warnings.warn('Wire "%s" within "%s" masked %s variable.'%(val_name,key,type(thedict[val_name])))
-                dict.__setitem__(thedict,val_name,val)
-    elif isinstance(val,list):
-        for subval in val:
-            meta_set_more_item(thedict,key,subval)
-    elif isinstance(val,VStruct):
-        if val._name == None:
-            val._name = key
-        for subval in val:
-            meta_set_more_item(thedict,key,subval)
-class VModuleMetaDict(dict):
-    read_only_objects = {'save','regist','auto_connect','comments','mydict'}
-    keywords = read_only_objects|{'name','ip_only'}
-    wire_keywords = {'name','comments','io','assignments','typename','width'}
+class VModuleMetaDict(NamingDict):
     def __init__(self,name=None):
         assert name!=None
         self.extra_codes = []
@@ -96,18 +35,6 @@ class VModuleMetaDict(dict):
         self['_name'] = name
         self['comments'] = []
         self['copyright'] = []
-    def __setitem__(self,key,val):
-        if key=='name':
-            if 'name' in self:
-                if not isinstance(val,str):
-                    raise TypeError('name must be str')
-                return dict.__setitem__(self,'_name',val)
-            else:
-                return dict.__setitem__(self,'name',val)
-                
-        meta_check_item(self,key,val)
-        meta_set_more_item(self,key,val)
-        dict.__setitem__(self,key,val)
 def get_magic_methods(mydict):
     def get_match_table(obj,pattern,io):
         if pattern.count('*')>1:
@@ -311,11 +238,14 @@ def get_magic_methods(mydict):
         else:
             VChecker.unhandled_type(obj)
     return regist,auto_connect
-class VModuleMeta(type):
+class VModuleMeta(type,NamingRoot):
     _global_ip_name = ''
     @staticmethod
     def __new__(meta,name,bases,attrs):
         cls = type.__new__(meta,name,bases,attrs)
+        for key,val in cls.__dict__.items():
+            if isinstance(val,NamingNode):
+                val._root = cls
         type.__setattr__(cls,'mydict',cls.__dict__)
         regist,auto_connect = get_magic_methods(cls.mydict)
         type.__setattr__(cls,'regist',regist)
@@ -330,8 +260,10 @@ class VModuleMeta(type):
                 ext = True
                 for key,val in base.mydict.items():
                     dict.__setitem__(mydict,key,val)
+                    if isinstance(val,NamingNode):
+                        val._root = mydict
                 dict.__setitem__(mydict,'mydict',mydict)
-                dict.__setitem__(mydict,'_name',name)
+                dict.__setitem__(mydict,'name',name)
                 break
         dict.__setitem__(mydict,'_ip_name',meta._global_ip_name)
         regist,auto_connect = get_magic_methods(mydict)
@@ -342,58 +274,25 @@ class VModuleMeta(type):
         dict.__setitem__(mydict,'regist',regist)
         dict.__setitem__(mydict,'auto_connect',auto_connect)
         return mydict
-    @property
-    def name(self):
-        if self._ip_name!='':
-            return self._ip_name+'_'+self._name
-        return self._name
     @classmethod
     def set_global_ip_name(cls,name):
         if not isinstance(name,str):
             raise TypeError('name must be "str".')
         cls._global_ip_name = name
     def __setattr__(self,key,val):
-        if key=='name':
-            self._name = val
-            return
-        meta_check_item(self.__dict__,key,val)
-        meta_set_more_attr(self,key,val)
-        type.__setattr__(self,key,val)
+        NamingRoot.__setattr__(self,key,val)
     def __getitem__(self,components,name=None):
         class GenModule(VModule):
             pass
         set_components(GenModule,components)
         return GenModule
-class VModule(ASTNode,metaclass=VModuleMeta):
+class VModule(ASTNode,NamingNode,metaclass=VModuleMeta):
     @classmethod
     def set_ip_name(cls,name):
         if not isinstance(name,str):
             raise TypeError('name must be "str".')
         cls._ip_name = name
-    @property
-    def name(self):
-        if self._name==None:
-            self._name = 'T_%d'%ASTNode.global_object_id
-            ASTNode.global_object_id += 1
-            warnings.warn('Missing name, auto-fixed.')
-        if self._scope==None:
-            return self._name
-        name = self._scope.name
-        if name==None:
-            return self._name
-        if self._name==None:
-            return name
-        return name+'_'+self._name
-    def __getattr__(self,key):
-        if hasattr(type(self)):
-            val = getattr(type(self))
-            if isinstance(val,(ASTNode,VStruct)):
-                warnings.warn('Operating class attribute "%d".'%key)
-        return object.__getattr__(self,key)
     def __setattr__(self,key,val):
-        if key=='name':
-            self._name = val
-            return
         if isinstance(val,Expr):
             if not hasattr(type(self),key):
                 raise KeyError('Module "%s" do not have any port named "%s".'%(self.name,key))
@@ -412,10 +311,9 @@ class VModule(ASTNode,metaclass=VModuleMeta):
                 elif val.typename=='reg':
                     raise KeyError('Assigning reg "%s" to output port "%s"'%(val.name,target))
             VChecker.fix_width(val,len(target))
-        object.__setattr__(self,key,val)
-    def __init__(self,name=None):
-        self._name = name
-        self._scope = None
+        NamingNode.__setattr__(self,key,val)
+    def __init__(self,name=None,reverse=False,bypass=True):
+        NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass)
         self.comments = []
         self.typename = 'module'
     @classmethod

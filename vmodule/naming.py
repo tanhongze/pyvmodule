@@ -119,7 +119,9 @@ class NamingDict(dict):
         if name!=key and name in self:NamingCheck.check_redef(name,val,self[name])
         dict.__setitem__(self,name,val)
         NamingCheck.collect_subscope(self,val)
-class NamingRoot:
+    def __getitem__(self,key):
+        return dict.__getitem__(self,key)
+class NamingRoot(type):
     def _receive(self,val):
         name = val.name
         if hasattr(self,name) and not getattr(self,name) is val:
@@ -145,4 +147,6 @@ class NamingRoot:
         if name!=key and name in self.__dict__:NamingCheck.check_redef(name,val,self.__dict__[name])
         type.__setattr__(self,name,val)
         NamingCheck.collect_subscope(self,val)
+    def __getattribute__(self,key):
+        return type.__getattribute__(self,key)
         

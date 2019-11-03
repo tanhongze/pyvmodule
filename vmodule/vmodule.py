@@ -24,7 +24,7 @@ from .naming import NamingDict
 from .naming import NamingRoot
 from .naming import NamingNode
 from .language.codegen import code_generators
-from .vstruct import set_components
+from .vstruct import VList
 from .vstruct import VStruct
 import warnings
 class VModuleMetaDict(NamingDict):
@@ -32,7 +32,7 @@ class VModuleMetaDict(NamingDict):
         assert name!=None
         self.extra_codes = []
         self['mydict'] = self
-        self['_name'] = name
+        self['name'] = name
         self['comments'] = []
         self['copyright'] = []
 def get_magic_methods(mydict):
@@ -238,7 +238,7 @@ def get_magic_methods(mydict):
         else:
             VChecker.unhandled_type(obj)
     return regist,auto_connect
-class VModuleMeta(type,NamingRoot):
+class VModuleMeta(NamingRoot):
     _global_ip_name = ''
     @staticmethod
     def __new__(meta,name,bases,attrs):
@@ -279,12 +279,10 @@ class VModuleMeta(type,NamingRoot):
         if not isinstance(name,str):
             raise TypeError('name must be "str".')
         cls._global_ip_name = name
-    def __setattr__(self,key,val):
-        NamingRoot.__setattr__(self,key,val)
     def __getitem__(self,components,name=None):
         class GenModule(VModule):
             pass
-        set_components(GenModule,components)
+        VList.set_components(GenModule,components)
         return GenModule
 class VModule(ASTNode,NamingNode,metaclass=VModuleMeta):
     @classmethod

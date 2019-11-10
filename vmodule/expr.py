@@ -613,6 +613,7 @@ class Wire(Expr,NamingNode):
             warnings.warn('Missing assignments')
         return value
     def __init__(self,*args,width=None,length=1,name=None,io=None,expr=None,reverse=False,bypass=False,wire_type='wire',**pragmas):
+        self.Wire = Wire
         self.set__default(wire_type)
         NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass)
         VChecker.identifier(self.name)
@@ -766,7 +767,7 @@ class ConstExpr(Expr):
             y = 0
             for i in range(len(x)):
                 y<<=8
-                c = ord[x[i]]
+                c = ord(x[i])
                 y |=c
                 if c>=256 or c<0:
                     raise RuntimeError('Charset Error')

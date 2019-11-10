@@ -261,7 +261,7 @@ class VerilogGen(CodeGen):
             self.modules.append(val)
             cls = type(val)
             for name,attr in val.__dict__.items():
-                if not isinstance(attr,Wire):
+                if not isinstance(attr,Wire) or name[0]=='_':
                     continue
                 assert hasattr(cls,name)
                 p = getattr(cls,name)
@@ -384,6 +384,8 @@ class VerilogGen(CodeGen):
         assert isinstance(obj,ASTNode)
         typename = self.remap_expr(obj)
         if typename in {'const','wire','reg','range'}:
+            if typename in {'wire','reg'} and obj._nameless:
+                warnings.warn('Detected nameless wire definition.')
             return [[str(obj)]]
         if typename in {'~','!',' ',' -',' &',' |'}:
             rhs = self.gen_braket(typename,obj.rhs,indent=indent)

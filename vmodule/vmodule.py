@@ -291,7 +291,7 @@ class VModule(ASTNode,NamingNode,metaclass=VModuleMeta):
             raise TypeError('name must be "str".')
         cls._ip_name = name
     def __setattr__(self,key,val):
-        if isinstance(val,Expr):
+        if key[0]!='_' and isinstance(val,Expr):
             if not hasattr(type(self),key):
                 raise KeyError('Module "%s" do not have any port named "%s".'%(self.name,key))
             target = getattr(type(self),key)

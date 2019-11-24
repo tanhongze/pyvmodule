@@ -13,7 +13,7 @@ def vrange(step,count,start=None,stop=None):
         yield i,slice(start+i*step,min(start+i*step+step,stop))
     return
 def decode(enc):
-    dec = enc.Wire(1<<len(enc))
+    dec = type(enc)(1<<len(enc))
     for i in range(1<<len(enc)):
         dec[i] = enc//i
     return dec

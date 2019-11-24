@@ -577,13 +577,16 @@ class Wire(Expr,NamingNode):
                 if width!=None:
                     VChecker.fix_width(arg,width)
                 expr = arg
-                width = len(arg)
+                width = len(expr)
             elif isinstance(arg,int):
                 if width!=None:
                     raise ValueError('Multiple specified width detected.')
                 width = arg
+            elif isinstance(arg,list):
+                expr = Concatenate(arg)
+                width = len(expr)
             else:
-                report__unhandled_type()
+                report__unhandled_type(arg)
         if width==None:
             width = 1
         return width,expr
@@ -613,7 +616,6 @@ class Wire(Expr,NamingNode):
             warnings.warn('Missing assignments')
         return value
     def __init__(self,*args,width=None,length=1,name=None,io=None,expr=None,reverse=False,bypass=False,wire_type='wire',**pragmas):
-        self.Wire = Wire
         self.set__default(wire_type)
         NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass)
         VChecker.identifier(self.name)
@@ -663,7 +665,7 @@ class Wire(Expr,NamingNode):
                 raise KeyError('Invalid format'%str(key))
             if self.length<=1:
                 raise KeyError('Invalid format for non-ram-like assignment'%str(key))
-            if isinstance(key[1],Index):
+            if isinstance(key[1],(slice,Index)):
                 key = (wrap_expr(key[0]),Index(key[1],self))
                 width = len(key[1])
             else:
@@ -738,6 +740,8 @@ def Reg(*args,**kwargs):
         raise KeyError('duplicated wire_type specifying "%s".'%kwargs['wire_type'])
     return Wire(*args,wire_type='reg',**kwargs)
 class Fetch(LeftJoinOperator):
+    @property
+    def length(self):return 1
     def __init__(self,lhs,rhs):
         self.set__default('[]')
         self.append__childs(lhs,rhs)
@@ -752,6 +756,8 @@ class Fetch(LeftJoinOperator):
             return (int(self.lhs)>>int(self.rhs.start))&((1<<len(self.rhs))-1)
         else:
             report__unhandled_type(self.rhs)
+    decorate__subscript = Wire.decorate__subscript
+    __getitem__ = Wire.__getitem__
     def __str__(self):
         if isinstance(self.rhs,Index):
             return '%s[%s:%s]'%(str(self.lhs),str(self.rhs.stop-1),str(self.rhs.start))

@@ -331,7 +331,10 @@ class VModule(ASTNode,NamingNode,metaclass=VModuleMeta):
             passed[val_name] = val
             yield val
     @classmethod
-    def save(cls,dir='../../gen/temp/',language='verilog',*args,printed=None,**kwargs):
+    def save(cls,dir=None,language='verilog',*args,printed=None,**kwargs):
+        if dir==None:
+            import sys
+            dir = sys.stdout
         if hasattr(cls,'ip_only') and cls.ip_only == True:
             return
         if printed==None:

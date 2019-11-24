@@ -50,9 +50,10 @@ class NamingNode:
             if val._scope==None:
                 val._scope = self
             if self._root!=None:
-                assert val._root==None or val._root is self._root
-                val._root = self._root
-                self._root._receive(val)
+                if val._root!=None and not val._root is self._root:raise RuntimeError('Cross module reference.')
+                if val._root==None:
+                    val._root = self._root
+                    self._root._receive(val)
         object.__setattr__(self,key,val)
     def __getattribute__(self,key):
         if key=='name':
@@ -94,11 +95,13 @@ class NamingCheck:
 class NamingDict(dict):
     def _receive(self,val):
         name = val.name
-        if name not in self:
+        if name in self:
+            if not self[name] is val:
+                raise KeyError('Redefined "%s" object "%s".'%(str(type(val)),name))
+        else:
             self[name] = val
-            return
-        if not self[name] is val:
-            raise KeyError('Redefined "%s" object "%s".'%(str(type(val)),name))
+        for child in val._childs:
+            self._receive(child)
     def __setitem__(self,key,val):
         if key in self:
             NamingCheck.check_writable(key)
@@ -124,9 +127,13 @@ class NamingDict(dict):
 class NamingRoot(type):
     def _receive(self,val):
         name = val.name
-        if hasattr(self,name) and not getattr(self,name) is val:
-            raise KeyError('Redefined "%s" object "%s".'%(str(type(val)),name))
-        setattr(self,val.name,val)
+        if hasattr(self,name):
+            if not getattr(self,name) is val:
+                raise KeyError('Redefined "%s" object "%s".'%(str(type(val)),name))
+        else:
+            setattr(self,val.name,val)
+        for child in val._childs:
+            self._receive(child)
     def __setattr__(self,key,val):
         if key in self.__dict__:
             NamingCheck.check_writable(key)

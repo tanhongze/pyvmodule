@@ -4,7 +4,7 @@ vmodule_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+'/../..
 cur_path =  set(sys.path)
 if vmodule_dir not in cur_path:
     sys.path.insert(0,vmodule_dir)
-from vmodule import *
+from pyvmodule import *
 class Counter(VModule):
     comments.append('example001 -- a simple counter.')
     clock = Wire(io='input')
@@ -13,7 +13,6 @@ class Counter(VModule):
     valid.comments.append('Enable signal for counter.')
     cnt = Reg(4,io='output')
     cnt_next = Wire(cnt+1)
-    
     when_ok = When(valid)[cnt_next]
     cnt[:] = Always(clock)[When(reset)[0].Otherwise[when_ok]]
 def get_counter(width):

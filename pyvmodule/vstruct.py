@@ -151,6 +151,32 @@ class VStruct(NamingNode):
     def __delitem__(self,key):
         del self._childs[key]
     def __setitem__(self,key,val):
-        self._childs[key] = val
+        if isinstance(key,int):
+            self._childs[key] = val
+        elif isinstance(key,slice) and key.start==None and key.stop==None:
+            if isinstance(val,VStruct):
+                for key,val in val.__dict__.items():
+                    if not isinstance(val,(VStruct,Expr)):continue
+                    if key in self.__dict__:
+                        getattr(self,key)[:] = getattr(val,key)
+            elif isinstance(val,Wire):
+                start = 0
+                for w in self._childs:
+                    stop = start + len(w)
+                    w[:] = val[start:stop]
+                    start = stop
+                if stop != len(val):raise ValueError('Unmatched width between "%s" and "%s"'%(self.name,val.name))
+            else:
+                raise TypeError(val,type(val))
+        else:raise TypeError(key)
     def __getitem__(self,key):
         return self._childs[key]
+    def __len__(self):
+        width = 0
+        for w in self._childs:
+            width += len(w)
+        return width
+    def __iter__(self):
+        for w in self._childs:
+            yield w
+        return

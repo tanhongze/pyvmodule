@@ -17,9 +17,9 @@
 #along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #----------------------------------------------------------------------
 from .codegen import *
-from vmodule.expr import *
-from vmodule.vmodule import VModule
-from vmodule.check import VChecker
+from pyvmodule.expr import *
+from pyvmodule.vmodule import VModule
+from pyvmodule.check import VChecker
 import warnings
 from typing import List
 class VerilogGen(CodeGen):
@@ -44,6 +44,7 @@ class VerilogGen(CodeGen):
         return lines
     def __init__(self):
         self.remap_mul_cat = True
+        self.iterations = 0
     def gen(self,obj:'VModuleMeta'):
         self.module = obj
         self.extract()
@@ -425,10 +426,12 @@ class VerilogGen(CodeGen):
         elif typename == '?:':
             contents = self.gen_mux(obj,indent=indent)
             expr = obj.rhs
+             
             while expr.typename=='?:':
+                self.iterations+=1
                 next = self.gen_mux(expr,indent=indent)
-                expr = obj.rhs
-                next[0].insert(0,myindent)
+                expr = expr.rhs
+                contents.append([myindent])
                 self.append_inline(contents,next)
             rhs = self.gen_expr(expr,indent=indent+1)
             self.append_inline(contents,rhs)

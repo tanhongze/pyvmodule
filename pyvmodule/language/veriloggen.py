@@ -389,7 +389,7 @@ class VerilogGen(CodeGen):
                 warnings.warn('Detected nameless wire definition.')
             return [[str(obj)]]
         if typename in {'~','!',' ',' -',' &',' |'}:
-            rhs = self.gen_braket(typename,obj.rhs,indent=indent)
+            rhs = self.gen_braket(typename,obj.rhs,indent=indent,level='more')
             rhs[0].insert(0,typename)
             return rhs
         myindent = '    '*indent

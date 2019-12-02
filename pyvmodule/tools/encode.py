@@ -1,10 +1,5 @@
-from vmodule import *
-from .comments import SynopsysComments as snp
+from pyvmodule import *
 from .gray_code import GrayCode
-from .logic import cond_if
-from .logic import bit_decode
-from .logic import bit_tensor
-from .verilog import clog2
 class Encoder:
     def __init__(self,width,exist=False,more=False,priority='none'):
         self.exist = exist

@@ -902,6 +902,24 @@ def Reduce(typename,exprs,long=False):
         else:
             expr.long = long
         return expr
+def ZeroExtend(expr,width,cut=False):
+    if isinstance(width,ASTNode):width = len(width)
+    if len(expr)<width:
+        return expr*Hexadecimal(0,width=width-len(expr))
+    elif len(expr)==width:
+        return expr
+    elif cut:
+        return expr[:width]
+    else:raise ValueError('Called to extending signal to width %d, however signal is narrowed'%(width))
+def SignExtend(expr,width,cut=False):
+    if isinstance(width,ASTNode):width = len(width)
+    if len(expr)<width:
+        return expr*(expr[-1]**(width-len(expr)))
+    elif len(expr)==width:
+        return expr
+    elif cut:
+        return expr[:width]
+    else:raise ValueError('Called to extending signal to width %d, however signal is narrowed'%(width))
 radix_names = {16:"'h",10:"'d",8:"'o",2:"'b"}
 radix_lengths={16:4,10:3,8:3,2:1}
 class ControlBlock(ASTNode):

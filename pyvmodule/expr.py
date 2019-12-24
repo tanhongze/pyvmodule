@@ -758,6 +758,8 @@ class Fetch(LeftJoinOperator):
             report__unhandled_type(self.rhs)
     decorate__subscript = Wire.decorate__subscript
     __getitem__ = Wire.__getitem__
+    def __setitem__(self,key,val):
+        self.lhs[(self.rhs,key)] = val
     def __str__(self):
         if isinstance(self.rhs,Index):
             return '%s[%s:%s]'%(str(self.lhs),str(self.rhs.stop-1),str(self.rhs.start))

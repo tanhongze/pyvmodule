@@ -88,10 +88,12 @@ class NamingCheck:
         if other.name == key and not val is other:
             raise KeyError('Redefining "%s" object "%s".'%(other.typename,key))
     def collect_subscope(self,val):
-        if not val._root is self:
-            for subval in val:
-                self._receive(subval)
-            val._root = self
+        if val._root is self:return
+        assert 1 is 1
+        if not val._root is None:raise RuntimeError('Cross module reference.')
+        val._root = self
+        for subval in val:
+            self._receive(subval)
 class NamingDict(dict):
     def _receive(self,val):
         name = val.name
@@ -100,8 +102,8 @@ class NamingDict(dict):
                 raise KeyError('Redefined "%s" object "%s".'%(str(type(val)),name))
         else:
             self[name] = val
-        for child in val._childs:
-            self._receive(child)
+            for child in val._childs:
+                self._receive(child)
     def __setitem__(self,key,val):
         if key in self:
             NamingCheck.check_writable(key)
@@ -132,8 +134,8 @@ class NamingRoot(type):
                 raise KeyError('Redefined "%s" object "%s".'%(str(type(val)),name))
         else:
             setattr(self,val.name,val)
-        for child in val._childs:
-            self._receive(child)
+            for child in val._childs:
+                self._receive(child)
     def __setattr__(self,key,val):
         if key in self.__dict__:
             NamingCheck.check_writable(key)

@@ -16,167 +16,137 @@
 #You should have received a copy of the GNU General Public License
 #along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #----------------------------------------------------------------------
-from .expr import Wire
-from .expr import Reg
+from .wire import Wire,Reg
 from .naming import NamingNode
-from .check import VChecker
-class VList:
-    list_format = '*_%d'
-    list_start = 0
-    io_translation = {'input':'output','output':'input','revert':None,None:'revert','inout':'inout'}
-    @classmethod
-    def set_list_format(cls,format='*_%d',start=0):
-        if '*' not in format or start<0:
-            raise ValueError('Invalid format string.')
-        VChecker.identifier(format.replace('*','foo')%(1+cls.list_start))
-        cls.list_format = format
-        cls.list_start = start
-        
-    @classmethod
-    def parse_object_error(cls,obj_str,trigger):
-        if trigger:raise ValueError('Unrecognized definition format "%s".'%obj_str)
-    @classmethod
-    def parse_object_width(cls,obj_str,width):
-        mentioned_width = None
-        if len(obj_str)>0 and obj_str[-1].isdigit():
-            for i in range(len(obj_str)):
-                if obj_str[i].isdigit():
-                    mentioned_width = int(obj_str[i:])
-                    break
-        if width!=None and mentioned_width!=None:cls.parse_object_error(width!=mentioned_width,obj_str)
-        if width!=None:return width
-        if mentioned_width!=None:return mentioned_width
-        return 1
-    @classmethod
-    def parse_object_type(cls,obj_str,obj_type):
-        count = 0
-        if 'r' in obj_str:
-            obj_type = 'reg'
-            count+=1
-        if 's' in obj_str:
-            obj_type = 'struct'
-            count+=1
-        if 'w' in obj_str:
-            obj_type = 'wire'
-            count+=1
-        cls.parse_object_error(obj_str,count>1)
-        return obj_type
-    @classmethod
-    def parse_object_io(cls,obj_str,io):
-        revert = io=='revert'
-        io = None if io=='revert' else io
-        count = 0
-        if 'd' in obj_str:
-            count+=1
-            revert = not revert
-        if 'i' in obj_str:
-            count+=1
-            io = 'input'
-        if 'o' in obj_str:
-            count+=1
-            io = 'output'
-        if 'x' in obj_str:
-            count+=1
-            io = 'inout'
-        if revert:io = cls.io_translation[io]
-        cls.parse_object_error(obj_str,count>1)
-        return io
-    @classmethod
-    def parse_object(cls,obj_str,width=None,io=None,obj_type='struct'):
-        if not isinstance(obj_str,str):raise TypeError('Unrecognized definition type "%s".'%str(type(obj_str)))
-        parts = obj_str.split('.')
-        if len(parts)==1:return parts[0],'wire',width,io
-        cls.parse_object_error(obj_str,len(parts)>2)
-        
-        name,obj_str = parts
-        for c in obj_str:cls.parse_object_error(obj_str,c.isupper())
-        
-        width = cls.parse_object_width(obj_str,width)
-        obj_type = cls.parse_object_type(obj_str,obj_type)
-        io = cls.parse_object_io(obj_str,io)
-        return name,obj_type,width,io
-    @classmethod
-    def get_object(cls,obj_type,width,io,name=None):
-        if obj_type == 'struct':return VStruct(name=name,io=io)
-        if io=='revert':io = None
-        if obj_type == 'reg':return Reg(width=width,io=io,name=name)
-        if obj_type == 'wire':return Wire(width=width,io=io,name=name)
-        raise NotImplementedError(obj_type)
-    @classmethod
-    def get_list_name(cls,name,i):
-        if name[-1].isdigit():
-            index = str(i+cls.list_start)
-            return name+'_'+index
-        return cls.list_format.replace('*',name)%(i+cls.list_start)
-    @classmethod
-    def set_components(cls,obj,components,io=None):
-        if isinstance(components,dict):return cls.set_components(obj,[c for c in components.items()],io=io)
-        if isinstance(components,(set,list)):
-            for c in components:cls.set_components(obj,c,io=io)
-            return
-        if isinstance(components,str):
-            name,obj_type,width,io = cls.parse_object(components,None,io,obj_type='wire')
-            return setattr(obj,name,cls.get_object(obj_type,width,io,name=name))
-        if not isinstance(components,tuple):
-            raise TypeError(type(components))
-        if len(components)!=2 and len(components)!=3:raise NotImplementedError(components)
-        width = None
-        if isinstance(components[1],int):width = components[1]
-        obj_type='struct'
-        if len(components)==2 and isinstance(components[1],(int,str)):obj_type='wire'
-        
-        name,obj_type,width,io = cls.parse_object(components[0],width,io=io,obj_type=obj_type)
-        suffix = ''
-        if isinstance(components[1],str):
-            suffix,obj_type,width,io = cls.parse_object(components[1],width=width,io=io,obj_type=obj_type)
-            if suffix!='':name+= '_'+suffix
-        
-        if len(components)==2 and isinstance(components[1],(int,str)):
-            return setattr(obj,name,cls.get_object(obj_type,width,io,name=name))
-        bypass = False
-        if len(components)==3:
-            if not isinstance(components[2],int):
-                raise TypeError('count of "%s" should be int-type, not "%s">'%(components[0],type(components[2])))
-            bypass = True
-            if isinstance(components[1],tuple):sublist = [(cls.get_list_name(name,i),*components[1]) for i in range(components[2])]
-            else:sublist = [(cls.get_list_name(name,i),components[1]) for i in range(components[2])]
-        else:sublist = components[1]
-        setattr(obj,name,VStruct(sublist,name=name,io=io,bypass=bypass))
-
-class VStruct(NamingNode):
-    def __init__(self,components=[],io=None,name=None,reverse=False,bypass=False):
-        self.io = io
-        NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass)
-        VList.set_components(self,components,io=self.io)
-    def __delitem__(self,key):
-        del self._childs[key]
-    def __setitem__(self,key,val):
-        if isinstance(key,int):
-            self._childs[key] = val
-        elif isinstance(key,slice) and key.start==None and key.stop==None:
-            if isinstance(val,VStruct):
-                for key,val in val.__dict__.items():
-                    if not isinstance(val,(VStruct,Expr)):continue
-                    if key in self.__dict__:
-                        getattr(self,key)[:] = getattr(val,key)
-            elif isinstance(val,Wire):
-                start = 0
-                for w in self._childs:
-                    stop = start + len(w)
-                    w[:] = val[start:stop]
-                    start = stop
-                if stop != len(val):raise ValueError('Unmatched width between "%s" and "%s"'%(self.name,val.name))
-            else:
-                raise TypeError(val,type(val))
-        else:raise TypeError(key)
-    def __getitem__(self,key):
-        return self._childs[key]
-    def __len__(self):
-        width = 0
-        for w in self._childs:
-            width += len(w)
-        return width
-    def __iter__(self):
-        for w in self._childs:
-            yield w
+__all__ = ['VStruct','get_components','set_components','declare_components']
+info_table = {
+    0x01:(None,Wire),
+    0x02:(None,Reg ),
+    0x11:('output',Wire),
+    0x12:('output',Reg ),
+    0x21:('input',Wire)}
+f_wire = 0x01
+f_stru = 0x04
+def get_width(decl):
+    for i in range(len(decl)):
+        if decl[i].isdigit():return int(decl[i:])
+    return 1
+def parse_object(decl,flag):
+    newflag = 0x01 if 'w' in decl else 0x0
+    newflag|= 0x02 if 'r' in decl else 0x0
+    newflag|= 0x04 if 's' in decl else 0x0
+    newflag|= 0x10 if 'o' in decl else 0x0
+    newflag|= 0x20 if 'i' in decl else 0x0
+    newflag|= 0x40 if 'd' in decl else 0x0
+    
+    # check type conflict
+    if newflag&0x07==0:newflag|=flag&0x07
+    elif newflag&0x03==0x03:raise ValueError('Conflicting declaration "%s", connot be both reg and wire.'%decl)
+    elif newflag&0x05==0x05:raise ValueError('Conflicting declaration "%s", connot be both wire and struct.'%decl)
+    elif newflag&0x06==0x06:raise ValueError('Conflicting declaration "%s", connot be both reg and struct.'%decl)
+    # check i/o conflict
+    if newflag&0x30==0x30:raise ValueError('Conflicting declaration "%s", connot be both input and output.'%decl)
+    
+    # inverts dual if dual passed
+    newflag^=flag&0x40
+    
+    # set i/o if i/o passed
+    if newflag&0x30==0x00:newflag|=flag&0x30
+    
+    # inverts i/o if dual
+    if newflag&0x40==0x40:newflag^=0x30
+    
+    if newflag&0x07==0x04:
+        return VStruct,{},newflag&0x77
+    else:
+        io,cls = info_table[newflag&0x37]
+        return cls,{'width':get_width(decl),'io':io},newflag&0x47
+# 'x.or32'
+# 'y.iw32'
+# ... ...
+def parse_str(decl,flag):
+    info = decl.split('.')
+    if len(info)>2:raise ValueError('Multiple "." in a single decl string "%s".'%decl)
+    name = None if len(info[0])==0 else info[0]
+    typestr = info[1]
+    cls,kwargs,flag = parse_object(typestr,flag)
+    return name,cls(**kwargs),flag
+# ('name','.w',3)
+# ('name.w',3)
+# ('name','.w3')
+# ('name.w3',)
+# ('name',['child1','child2'])
+# ('name',['child1','child2'],3)
+def parse_tuple(decl,flag):
+    if not isinstance(decl,tuple):raise TypeError()
+    if len(decl)<=0:raise ValueError('Invalid declare information "%s"'%str(decl))
+    if len(decl)==1:return declare_components(decl[0],flag)
+    
+    component_types = (tuple,list,dict)
+    if isinstance(decl[-1],component_types):
+        name,obj,flag_new = parse_tuple(decl[:-1],flag)
+        set_components(obj,decl[-1],flag=flag_new)
+        return name,obj,flag
+    if isinstance(decl[-2],component_types):
+        if not isinstance(decl[-1],int):raise TypeError()
         return
+    if not isinstance(decl[-1],(int,str)):raise TypeError()
+    for i in range(len(decl)-1):
+        if not isinstance(decl[-1],str):raise TypeError()
+    if isinstance(decl[-1],int):
+        if decl[-2][-1].isdigit():raise ValueError()
+    return parse_str(''.join(str(s) for s in decl),flag&0x7,flag)
+    for i in range(len(decl)):
+        if isinstance(decl[i],):
+            parse_tuple(decl[:i],flag)
+            
+            return
+def get_init_flag(io):
+    if io is None:return 0x00
+    elif io=='input':return 0x20
+    elif io=='output':return 0x10
+    else:raise ValueError(io)
+def set_components(obj,infos,io=None,flag=None):
+    if flag is None:flag = get_init_flag(io)
+    if isinstance(infos,dict):
+        for key,decl in infos.items():
+            if isinstance(decl,(set,list,dict)):
+                val = VStruct(decl)
+                setattr(obj,key,val)
+            else:
+                name,val,newflag = parse_target(decl,flag)
+                if name is None:setattr(obj,key,val)
+                else:
+                    child = VStruct()
+                    setattr(child,name,val)
+                    setattr(obj,key,child)
+    elif isinstance(infos,(set,list)):
+        for decl in infos:
+            set_components(obj,decl,flag=flag)
+    else:
+        name,val,newflag = parse_target(infos,flag)
+        setattr(obj,name,val)
+def parse_target(infos,flag):return parse_str(infos,flag|f_wire) if isinstance(infos,str) else parse_tuple(infos,flag)
+def declare_components(infos,io=None,flag=None):
+    if flag is None:flag = get_init_flag(io)
+    name,val,newflag = parse_target(infos,flag)
+    if not name is None:val.name = name
+    return val
+class VStruct(NamingNode):
+    @property
+    def typename(self):return 'struct'
+    def __init__(self,components=[],**kwargs):
+        NamingNode.__init__(self,**kwargs)
+        set_components(self,components)
+    def __setitem__(self,key,val):
+        if not isinstance(key,slice) and key.start is None and key.stop is None and key.step is None:
+            raise TypeError(key)
+        if not isinstance(val,VStruct):
+            raise TypeError(val,type(val))
+        for key,val in val._naming_var.items():
+            target = self._naming_var.get(key,None)
+            if target is None:setattr(self,key,val)
+            else:target[:] = getattr(val,key)
+    def _node_clone(self):return VStruct(reverse=self._reverse,bypass=self._bypass)
+    def __iter__(self):
+        for name,var in self._naming_var.items():yield var

@@ -1,0 +1,1 @@
+from .instdoc import InstDoc

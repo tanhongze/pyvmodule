@@ -1,1 +1,1 @@
-__all__ = ['codegen']
+__all__ = ['codegen','verilog']

@@ -1,10 +1,11 @@
 from .ast import ASTNode
+from .naming import NamingRecv
 from .expr import wrap_expr,Expr
 from .width_calc import expr_match_width
 from .width_calc import expr_calc_width
 from .tools.check.driver import ControlBlockDriverChecker as DriverChecker
 __all__ = ['ControlBlock','Always','Initial','AlwaysDelay','When']
-class ControlBlock(ASTNode):
+class ControlBlock(ASTNode,NamingRecv):
     _n_childs = ASTNode._controlblock_n_childs
     lines_show_pairing = 10
     @property
@@ -92,10 +93,12 @@ class ControlBlock(ASTNode):
                 if not isinstance(y,ASTNode):raise TypeError(type(y))
                 typename = y._typename
                 if typename == 'wire':raise TypeError('Control block cannot set value for wire "%s".'%str(y))
-                if typename == 'reg':target,mask = y,(1<<len(y))-1
+                if typename == 'reg':
+                    target = y
+                    mask = (1<<len(y))-1
                 elif typename == '[]':
                     target = y._get_target()
-                    mask = y.rhs._range_mask
+                    mask   = y._range_mask
                 else:raise TypeError(typename)
                 target._append_controlblock(self)
                 x = wrap_expr(x)
@@ -109,7 +112,8 @@ class ControlBlock(ASTNode):
         return self
     def _get_drive_mask(self,target):
         if not isinstance(target,ASTNode) or target.typename!='reg':raise TypeError(type(target))
-        return self._driver_checker.get_mask(id(target))
+        mask = self._driver_checker.get_mask(id(target))
+        return mask
 class Always(ControlBlock):
     @property
     def cond(self):return self.childs[1]
@@ -123,6 +127,7 @@ class Always(ControlBlock):
         self.edge = edge
         self.cond = cond
 class Initial(ControlBlock):
+    def _get_drive_mask(self,target):return 0
     def __init__(self,body=None,name=None):
         self._set_default('initial',name)
         if not body is None:self.body = body

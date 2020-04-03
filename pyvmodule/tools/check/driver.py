@@ -7,7 +7,7 @@ class ControlBlockDriverChecker:
     def __init__(self,init=None):
         self.masks = {} if init is None else init
         self.total = {} if init is None else init.copy()
-        self.brothers = []
+        self.brothers = [self]
         self.parent = None
         self.child = None
     def assert_non_overlap(self,masks,id,area):
@@ -26,13 +26,17 @@ class ControlBlockDriverChecker:
         return self.total.get(id,0)
     def copy(self):
         return ControlBlockDriverChecker(self.masks.copy())
+    @alert_multidriven
     def add(self,id,area):
+        flag = False
         if not self.child is None:
-            if self.assert_non_overlap(self.child.total,id,area):return True
-        if self.assert_non_overlap(self.masks,id,area):return True
-        self.masks[id] = self.masks.get(id,0)|area
-        self.total[id] = self.total.get(id,0)|area
-        if self.insert_parent_total(id,area):return True
+            if self.assert_non_overlap(self.child.total,id,area):flag = True
+        elif self.assert_non_overlap(self.masks,id,area):flag = True
+        else:
+            self.masks[id] = self.masks.get(id,0)|area
+            self.total[id] = self.total.get(id,0)|area
+            if self.insert_parent_total(id,area):flag = True
+        return flag
     @alert_multidriven
     def set_brother(self,other):
         brothers = self.brothers+other.brothers

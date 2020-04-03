@@ -1,5 +1,5 @@
 from .ast import ASTNode
-from .expr import Expr,wrap_expr,BinaryOperator
+from .expr import Expr,wrap_expr,BinaryOperator,Concatenate
 from .naming import NamingNode
 from .ctrlblk import Always,When,Else,ControlBlock
 from .exceptions import a_value_positive,a_width_positive,e_unhandled_type
@@ -168,7 +168,14 @@ class Wire(Expr,NamingNode):
         for i in range(len(self)):
             if (self._driven>>i)&1:locs.append(str(i))
         return '// unconnected, at bit'+','.join(locs)
+    def _auto_port_determined(self):
+        if self.io=='auto':
+            if self._driven==0:self.io='input'
+            else:self.io='output'
+        elif self.io is None:
+            if self._driven==0:self.io='input'
 class Reg(Wire):
+    def _auto_port_determined(self):pass
     @property
     def io(self):return self._io
     @io.setter
@@ -266,10 +273,6 @@ def repair_const_type(index,width,allow_eq):
 def check_const_repair(index,width,allow_eq):
     return repair_const_type(check_const_type(index),width,allow_eq)
 class Index(ASTNode):
-    @property
-    def _range_mask(self):return ((1<<self.width)-1)<<self.start if self.typename=='range' else (1<<self._range_stop)-1
-    @property
-    def _range_stop(self):return (1<<len(self.start))+self.width-1
     def __init__(self,key,context):
         width = context.width if context.length<=1 else context.length
         if isinstance(key,(int,ASTNode)):
@@ -338,7 +341,17 @@ class Index(ASTNode):
     def __eq__(self,other):
         if not isinstance(other,Index):return False
         else:return self.start==other.start and self.stop==other.stop and self.width==other.width
+    @property
+    def _range_mask(self):return ((1<<self.width)-1)<<self.start
 class Fetch(BinaryOperator):
+    @property
+    def _range_mask(self):
+        if isinstance(self.lhs,Wire):
+            if self.rhs.typename=='range' and self.lhs.length==1:return self.rhs._range_mask
+            else:return (1<<len(self.lhs))-1
+        else:
+            if self.rhs.typename=='range':return self.rhs._range_mask
+            else:return (1<<len(self.lhs.lhs))-1
     @property
     def rhs(self):return self.childs[0]
     @rhs.setter

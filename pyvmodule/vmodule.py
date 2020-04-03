@@ -21,11 +21,12 @@ import sys
 from .expr import *
 from .wire import Wire
 from .ast import ASTNode
-from .naming import NamingDict,NamingRoot,NamingNode,ports
+from .naming import NamingDict,NamingRoot,NamingNode
 from .naming import a_name_valid
 from .tools.auto_connect import prepare_auto_connect
 from .tools.module.copy import meta_copy
 from .vstruct import VStruct,set_components
+from .ctrlblk import ControlBlock
 import warnings
 def name_getter(self,key):return self['_mod_name']
 def ip_only_getter(self,key):return self['_ip_only']
@@ -106,10 +107,6 @@ class VModuleMeta(NamingRoot):
         mydict = VModuleMetaDict(name,prev)
         meta_copy(mydict,bases)
         return mydict
-    def __getitem__(self,components,name=None):
-        class GenModule(VModule):pass
-        set_components(GenModule,components)
-        return GenModule
     @property
     def typename(self):return 'module'
     @property
@@ -117,8 +114,6 @@ class VModuleMeta(NamingRoot):
     @language.setter
     def language(self,language):ASTNode.set_language(language)
     def __str__(self):return str(VModuleHelper(self))
-    def ports(self):
-        for val in ports(self):yield val
 class VModuleHelper:
     @property
     def name(self):return self.module.name
@@ -129,22 +124,16 @@ class VModuleHelper:
             if lower_name in names:raise NameError('Name "%s" and "%s" are conflicting when case sensitivity is disabled.'%(pre.ins_name,val.ins_name))
             names[lower_name] = name
     def __str__(self):return self.code
-    def auto_port(self):
-        for name,var in self.names.items():
+    @staticmethod
+    def auto_port(items):
+        for name,var in items:
             if not isinstance(var,Wire):continue
-            if var.io=='auto':
-                if var.typename=='reg':var.io='output'
-                elif var._driven==0:var.io='input'
-                else:var.io='output'
-                continue
-            if var.typename!='wire':continue
-            if not VModule.auto_port:continue
-            if var.io is None and var._driven==0:var.io='input'
+            var._auto_port_determined()
     def __init__(self,obj,**kwargs):
         self.module = obj
         self.names = obj._naming_var.copy()
         if kwargs.get('enable_case_sensitivity',False):self.check_case_sensitivity()
-        self.auto_port()
+        self.auto_port(self.names.items())
         self.clock = self.names.get('clock',None)
         self.extract()
         self.code = self.gen()
@@ -157,6 +146,10 @@ class VModuleHelper:
         self.registers = [] 
         self.controlblocks = {}
         for name,node in self.names.items():
+            for obj in node._naming_recv:
+                if isinstance(obj,ControlBlock):
+                    self.controlblocks[id(obj)] = obj
+                else:raise TypeError(obj)
             if node.typename=='struct':continue
             getattr(self,'extract_'+node.typename)(node)
     def extract_module(self,node):
@@ -179,13 +172,9 @@ from .vcircuit import VCircuit
 class VModule(NamingNode,metaclass=VModuleMeta):
     def _setattr_(self,key,val):
         p = type(self)._naming_var.get(key,None) if key[0]!='_' else None
-        if not isinstance(p,Wire):pass
-        elif not p.io is None:
+        if isinstance(p,Wire) and not p.io is None:
             val = wrap_expr(val)
             val._connect_port(self,p)
-        else:raise NameError('\n'.join([
-            'Module "%s" do not have any port named "%s".'%(self.ins_name,key),
-            'Candidates are:'+','.join([str(port) for port in self.ports()])]))
         object.__setattr__(self,key,val)
     def __getattr__(self,key):
         p = type(self)._naming_var.get(key,None) if key[0]!='_' else None

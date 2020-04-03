@@ -14,7 +14,7 @@ class VFunction(ASTNode):
         contents = [[' '*indent,'$',self.name]]
         if len(self.args)==0:return contents
         contents[-1].append('(')
-        contents[-1].extend(('"%s"'%arg if isinstance(arg,str) else str(arg)) for arg in self.args)
+        contents[-1].append(','.join([('"%s"'%arg if isinstance(arg,str) else str(arg)) for arg in self.args]))
         contents[-1].append(')')
         return contents
 def display   (*args ):return VFunction('display',*args)

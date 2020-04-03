@@ -1,4 +1,5 @@
 __all__ = ['expr_generate_funcs','cblk_generate_funcs','inst_generate','decl_generate','meta_generate']
+from pyvmodule.tools import viterator as viter
 from .code_align import align_expr_area
 from .code_align import align_mat
 from .code_align import align_assign
@@ -294,11 +295,12 @@ def inst_generate(m,myindent=''):
     cls = type(m)
     ins_name = m.ins_name
     mod_name = cls.mod_name
-    ports = [val for val in cls.ports()]
+    ports = [val for val in viter.ports(cls)]
     if len(ports)<=0:warnings.warn('No port defined in module "%s".'%mod_name)
     contents = []
     for i in range(len(ports)):
         val = ports[i]
+        val._auto_port_determined()
         vname = val.ins_name
         contents.append(['    .',vname,'(',str(m.__dict__.get(vname,'')),')','' if i+1==len(ports) else ',',io_details[val.io],str(len(val))])
     contents = align_mat(contents)

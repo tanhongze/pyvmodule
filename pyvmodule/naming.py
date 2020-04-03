@@ -1,4 +1,4 @@
-__all__ = ['NamingNode','NamingDict','NamingRoot','a_name_valid']
+__all__ = ['NamingNode','NamingDict','NamingRoot','NamingRecv','a_name_valid']
 from .ast import ASTNode
 import warnings
 def raise_error(err):raise err
@@ -23,19 +23,24 @@ def a_name_no_alias(name,var,ssa,val=None):a_name_once(name,var,val) and a_name_
 def new_anonymous_name(self,val=[0]):
     val[0] += 1
     return 'temp_%d'%val[0]
-def naming_setattr(getval,setval):
+def naming_selected_setattr(self,key,val):
+    if isinstance(self,NamingRoot):return NamingRoot._setattr_(self,key,val)
+    else:self._setattr_(key,val)
+def naming_setattr(getval):
     def _naming_setattr(self,key,val):
-        if key[0]=='_':return setval(self,key,val)
+        if key[0]=='_':return naming_selected_setattr(self,key,val)
         if key in self._naming_ssa:
             ssa_list = getval(self,key+'s')
-            setval(self,key,val)
+            naming_selected_setattr(self,key,val)
             key = key+str(len(ssa_list))
             ssa_list.append(val)
         naming = self._naming_var
         a_name_once(key,naming,val)
         if isinstance(val,NamingNode):
             naming_parent(val,self,key)
-        setval(self,key,val)
+        if isinstance(val,NamingRecv):
+            self._naming_recv.append(val)
+        naming_selected_setattr(self,key,val)
     return _naming_setattr
 def naming_grow(p,pname,c,cname):
     if not c._mounting or p._bypass:return cname
@@ -111,7 +116,8 @@ def naming_parent(self,parent,key):
         else:
             if isinstance(type(parent),NamingRoot):
                 for name,val in self._naming_var.items():
-                    setattr(parent,'%s_%s'%(key,name),val)
+                    newname = '%s_%s'%(key,name)
+                    setattr(parent,newname,val)
     else:
         if not isinstance(parent,(NamingDict,NamingRoot)):raise TypeError('Invalid parent type.')
         if self._naming_nameless:
@@ -123,6 +129,10 @@ def naming_parent(self,parent,key):
             return
         elif parent is root:return
         else:raise ReferenceError('Cross module reference.')
+def print_args(*args):
+    print(args)
+    raise NotImplementedError()
+class NamingRecv:pass
 class NamingNode(ASTNode):
     @property
     def ins_name(self):return naming_form_name(self)
@@ -147,6 +157,7 @@ class NamingNode(ASTNode):
     def __init__(self,name=None,reverse=False,bypass=False,mounting=True,**kwargs):
         self._naming_ssa = set()
         self._naming_var = {}
+        self._naming_recv = []
         self._naming_parent = None
         self._naming_nameless = name is None
         self._ins_name = None
@@ -158,7 +169,7 @@ class NamingNode(ASTNode):
     def __str__(self):return self.name
     @property
     def _parent(self):return self._parent_node
-    __setattr__ = naming_setattr(getattr,object.__setattr__)
+    __setattr__ = naming_setattr(getattr)
     def __iter__(self):
         for name,val in self._naming_var.items():yield val
     _setattr_ = object.__setattr__
@@ -167,10 +178,11 @@ class NamingDict(dict):
     def _naming_ssa(self):return self['_naming_ssa']
     @property
     def _naming_var(self):return self['_naming_var']
-    __setitem__ = naming_setattr(dict.__getitem__,dict.__setitem__)
+    __setitem__ = naming_setattr(dict.__getitem__)
     def __init__(self,prev):
-        self['_naming_ssa'] = set()  if '_naming_ssa' not in prev else prev['_naming_ssa']
-        self['_naming_var'] = dict() if '_naming_var' not in prev else prev['_naming_var']
+        self['_naming_ssa']  = set()  if '_naming_ssa'  not in prev else prev['_naming_ssa']
+        self['_naming_var']  = dict() if '_naming_var'  not in prev else prev['_naming_var']
+        self['_naming_recv'] = list() if '_naming_recv' not in prev else prev['_naming_recv']
     def enable_ssa(self,name):
         a_name_no_alias(name,self._naming_var,self._naming_ssa)
         self._naming_ssa.add(name)
@@ -178,8 +190,5 @@ class NamingDict(dict):
     _setattr_ = dict.__setitem__
 class NamingRoot(type):
     enable_ssa = NamingNode.enable_ssa
-    _setattr_ = type.__setattr__
-    __setattr__ = naming_setattr(getattr,type.__setattr__)
-def ports(x):
-    for name,var in x._naming_var.items():
-        if var.typename in {'wire','reg'} and not var.io is None:yield var
+    _setattr_   = type.__setattr__
+    __setattr__ = naming_setattr(getattr)

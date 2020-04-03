@@ -4,7 +4,17 @@ vmodule_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+'/../..
 cur_path =  set(sys.path)
 if vmodule_dir not in cur_path:
     sys.path.insert(0,vmodule_dir)
-from pyvmodule import *
+from pyvmodule.develope import *
+from pyvmodule.tools.logic import decode
+class TestAlways(VModule):
+    clock = Wire(io='input')
+    reset = Wire(io='input')
+    x = Wire(io='input')
+    sel = Wire(io='input')
+    beta = Reg(io='output')
+    alpha = Reg(io='output')
+    blk =  When(reset)[alpha:0][beta:0].Otherwise[When(sel)[beta:x].Otherwise[alpha:x]]
+TestAlways.save()
 class Counter(VModule):
     comments.append('example001 -- a simple counter.')
     clock = Wire(io='input')
@@ -14,7 +24,9 @@ class Counter(VModule):
     cnt = Reg(4,io='output')
     cnt_next = Wire(cnt+1)
     when_ok = When(valid)[cnt_next]
-    cnt[:] = Always(clock)[When(reset)[0].Otherwise[when_ok]]
+    #cnt[:] = Always(clock)[When(reset)[0].Otherwise[when_ok]]
+    cnt[:] = When(reset)[0].Otherwise[when_ok]
+Counter.save()
 def get_counter(width):
     class Counter(VModule):
         name = 'counter_%d'%width
@@ -54,7 +66,10 @@ class CounterConstructor:
                 when_ok = cnt_next
             cnt[:] = Always(clock)[When(reset)[0].Otherwise[when_ok]]
         return Counter
+class Decoder(VModule):
+    di = Wire(5,io='input')
+    do = decode(di)
+    do.io = 'output'
 if __name__ == '__main__':
-    Counter.save(dir=sys.stdout)
-    get_counter(5).save(dir=sys.stdout)
-    CounterConstructor(width=3,valid=False).implement().save(dir=sys.stdout)
+    Decoder.save()
+    get_counter(5).save()

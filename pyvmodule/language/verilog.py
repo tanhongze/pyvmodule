@@ -236,8 +236,10 @@ def gen_body(obj,indent):
 def gen_end(obj,myindent,pairing=None):
     contents = [[myindent,'end']]
     if not pairing is None:
-        contents[-1].extend(['// ',pairing[0]])
-        for i in range(1,len(pairing)):contents.append([myindent,'// ',pairing[i]])
+        contents[-1].append('// ')
+        contents[-1].extend(pairing[0])
+        for i in range(1,len(pairing)):
+            contents.append([myindent,'// ']+pairing[i])
     return contents
 def gen_begin_end(obj,indent,contents):
     myindent = ' '*indent
@@ -354,5 +356,10 @@ def meta_generate(self,*args,**kwargs):
         contents.extend(blk._generate(indent=0))
     for ins in self.modules:
         contents.extend(ins._generate())
-    contents.append('endmodule // '+self.module.mod_name)
-    return '\n'.join(''.join(line) for line in contents)
+    contents.append(['endmodule // '+self.module.mod_name])
+    lines = []
+    for words in contents:
+        line = ''.join(words)
+        lines.append(line)
+    result = '\n'.join(lines)
+    return result

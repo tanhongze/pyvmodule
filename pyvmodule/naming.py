@@ -42,8 +42,8 @@ def naming_setattr(getval):
             self._naming_recv.append(val)
         naming_selected_setattr(self,key,val)
     return _naming_setattr
-def naming_grow(p,pname,c,cname):
-    if not c._mounting or p._bypass:return cname
+def naming_grow(p,pname,cname):
+    if p._bypass:return cname
     if p._reverse:return '%s_%s'%(cname,pname)
     else:return '%s_%s'%(pname,cname)
 def naming_ancestors(self,tail=False):
@@ -59,8 +59,9 @@ def naming_extract(self,prev):
     new_names = [next]
     for name,node in self._naming_var.items():
         nodes.append(node)
-        new_names.append(naming_grow(self,next,node,name))
-    if not prev is None:old_names = [prev]+[naming_grow(self,prev,node,name) for name,node in self._naming_var.items()]
+        new_names.append(naming_grow(self,next,name) if node._mounting else name)
+    if not prev is None:
+        old_names = [prev]+[(naming_grow(self,prev,name) if node._mounting else name) for name,node in self._naming_var.items()]
     else:old_names = []
     return nodes,new_names,old_names
 def naming_anonymous_name(self):
@@ -70,6 +71,7 @@ def naming_consistency_maintaining(self,prev=None):
     if self._naming_parent is None:return
     if self._ins_name==prev:return
     nodes,new_names,old_names = naming_extract(self,prev)
+    mounting = self._mounting
     for ancestor in naming_ancestors(self,tail=True):
         for i in range(len(old_names)):
             del ancestor._naming_var[old_names[i]]
@@ -79,10 +81,12 @@ def naming_consistency_maintaining(self,prev=None):
             ancestor._naming_var[new_name] = nodes[i]
             ancestor._setattr_(new_name,nodes[i])
         if not isinstance(ancestor,NamingNode):continue
-        for i in range(len(new_names)):
-            new_names[i] = naming_grow(ancestor,ancestor._ins_name,nodes[i],new_names[i])
-        for i in range(len(old_names)):
-            old_names[i] = naming_grow(ancestor,ancestor._ins_name,nodes[i],old_names[i])
+        if mounting:
+            for i in range(len(new_names)):
+                new_names[i] = naming_grow(ancestor,ancestor._ins_name,new_names[i])
+            for i in range(len(old_names)):
+                old_names[i] = naming_grow(ancestor,ancestor._ins_name,old_names[i])
+            mounting = ancestor._mounting
     return
 def naming_form_name(self):
     if self._naming_nameless:warnings.warn('Nameless object reference detected .')
@@ -90,6 +94,7 @@ def naming_form_name(self):
     if not self._mounting:return self._ins_name
     parts = [self._ins_name]
     for ancestor in naming_ancestors(self):
+        if not ancestor._mounting:break
         if ancestor._bypass:continue
         if ancestor._ins_name is None:continue
         if ancestor._reverse:parts.append(ancestor._ins_name)
@@ -116,7 +121,7 @@ def naming_parent(self,parent,key):
         else:
             if isinstance(type(parent),NamingRoot):
                 for name,val in self._naming_var.items():
-                    newname = '%s_%s'%(key,name)
+                    newname = '%s_%s'%(key,name) if self._mounting else name
                     setattr(parent,newname,val)
     else:
         if not isinstance(parent,(NamingDict,NamingRoot)):raise TypeError('Invalid parent type.')

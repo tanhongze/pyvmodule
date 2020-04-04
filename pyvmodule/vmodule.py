@@ -173,6 +173,7 @@ class VModule(NamingNode,metaclass=VModuleMeta):
     def _setattr_(self,key,val):
         p = type(self)._naming_var.get(key,None) if key[0]!='_' else None
         if isinstance(p,Wire) and not p.io is None:
+            if self.__dict__.get(key,None) is val:return
             val = wrap_expr(val)
             val._connect_port(self,p)
         object.__setattr__(self,key,val)

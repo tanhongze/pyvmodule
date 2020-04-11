@@ -1,5 +1,5 @@
 from pyvmodule.develope import *
-__all__ = ['DataLine','ZeroLine','PipeLine']
+__all__ = ['DataLine','ZeroLine','PipeLine','KeepBuffer']
 class XLine(VStruct):
     '''
     expected:
@@ -14,6 +14,7 @@ class XLine(VStruct):
     '''
     _properties = dict()
     _shared = set()
+    _regenerate = set()
     @property
     def width(self):return self._width
     @property
@@ -28,20 +29,19 @@ class XLine(VStruct):
         self._align = align
         self._way_num = way_num
         self._io = io
-        self._init()
+        self._init(align=align,way_num=way_num,io=io,**kwargs)
         self._init_end()
-    def _init(self):
+    def _init(self,**kwargs):
         '''
         override this function to define "_infos" dynamically.
         '''
         pass
     @classmethod
-    def _detect_regenerate(cls):
-        if not hasattr(cls,'_regenerate'):
-            regen = set()
-            for name in vars(cls):
-                if name.startswith('regenerate_'):regen.add(name[len('regenerate_'):])
-            cls._regenerate = regen
+    def detect_regenerate(cls):
+        regen = set()
+        for name in vars(cls):
+            if name.startswith('regenerate_'):regen.add(name[len('regenerate_'):])
+        cls._regenerate = regen
     @property
     def entry(self):
         e = Wire(self._width)
@@ -99,9 +99,6 @@ class DataLine(XLine):
             elif name in self._shared:
                 if idx==0:s[:] = t
             else:s[width*idx::width] = t
-    def __setitem__(self,key,val):
-        if isinstance(key,int):self.collects(key,val)
-        else:self.collects(None,val)
 class ZeroLine(DataLine):
     _infos = []
     def __getattr__(self,name):return 0

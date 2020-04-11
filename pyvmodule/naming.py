@@ -79,7 +79,7 @@ def naming_consistency_maintaining(self,prev=None):
             new_name = new_names[i]
             a_name_no_alias(new_name,ancestor._naming_var,ancestor._naming_ssa,nodes[i])
             ancestor._naming_var[new_name] = nodes[i]
-            ancestor._setattr_(new_name,nodes[i])
+            naming_selected_setattr(ancestor,new_name,nodes[i])
         if not isinstance(ancestor,NamingNode):continue
         if mounting:
             for i in range(len(new_names)):

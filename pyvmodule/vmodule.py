@@ -26,7 +26,7 @@ from .naming import a_name_valid
 from .tools.auto_connect import prepare_auto_connect
 from .tools.module.copy import meta_copy
 from .vstruct import VStruct,set_components
-from .ctrlblk import ControlBlock
+from .ctrlblk import ControlBlock,Initial
 import warnings
 def name_getter(self,key):return self['_mod_name']
 def ip_only_getter(self,key):return self['_ip_only']
@@ -148,7 +148,7 @@ class VModuleHelper:
         for name,node in self.names.items():
             for obj in node._naming_recv:
                 if isinstance(obj,ControlBlock):
-                    self.controlblocks[id(obj)] = obj
+                    if isinstance(obj,Initial):self.controlblocks[id(obj)] = obj
                 else:raise TypeError(obj)
             if node.typename=='struct':continue
             getattr(self,'extract_'+node.typename)(node)

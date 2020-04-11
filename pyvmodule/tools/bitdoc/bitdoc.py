@@ -8,18 +8,18 @@ class Field:
     def name(self):return self._name
     @name.setter
     def name(self,name):
-        self._name_origin = name
-        self._name = name.lower().replace('.','_')
-    @property
-    def super_name(self):return self._name if self._super_name is None else self._super_name
-    @property
-    def super_start(self):return 0 if self.super_place is None else self.super_place[0]
-    @property
-    def super_end(self):return self.width if self.super_place is None else self.super_place[1]
-    @property
-    def super_width(self):return self.super_end - self.super_start
-    @property
-    def super_mask(self):return ((1<<self.super_width)-1)<<self.super_start
+        if name=='':
+            raise NameError('Empty name in "%s". At %s.'%(self.entry.name,self.entry.location))
+        if not name[0].isidentifier():
+            raise NameError('Name "%s"  is invalid in "%s". At %s.'%(self.field,self.entry.name,self.entry.location))
+        for i in range(1,len(name)):
+            c = name[i]
+            if not c.isalnum() or c in {'_'}:
+                self._name_origin = name[:i]
+                break
+        else:
+            self._name_origin = name
+        self._name = self._name_origin.lower().replace('.','_')
     def __init__(self,entry,start,end,width,mask,field,*args,**kwargs):
         self.entry = entry
         self.start = start
@@ -27,28 +27,8 @@ class Field:
         self.width = width
         self.mask = mask
         self.field = field
-        if self.field=='':raise NameError('Empty name in "%s". At %s.'%(self.entry.name,self.entry.location))
-        if not self.field[0].isidentifier():raise NameError('Name "%s"  is invalid in "%s". At %s.'%(self.field,self.entry.name,self.entry.location))
-        self._name = self.field
-        tail = ''
-        self.super_place = None
-        self._super_name = None
-        for i in range(1,len(self._name)):
-            if not (self._name[i].isalnum() or self._name[i] in {'_'}):
-                tail = self._name[i:]
-                self._name = self._name[:i]
-                break
-        
-        if tail.startswith('['):
-            tail = tail[1:]
-            area,tail = tail.split(']')
-            area = area.split(':')
-            if len(area)==1:self.super_place = (int(area[0]),int(area[0])+1)
-            else:self.super_place = (int(area[1]),int(area[0])+1)
-            self._super_name = self._name
-            self._name = self._name + str(self.super_end)
-        if tail != '':raise NotImplementedError(field)
-        self.parse(*args,**kwargs)
+        self.name  = field
+        self.parse(field[len(self.name):])
     def parse(self,*args,**kwargs):pass
 class Entry:
     _name_force_lower = True
@@ -77,7 +57,6 @@ class Entry:
     def location(self):return '<Location File="%s",Sheet="%s",Row="%s"/>'%self._location
     @classmethod
     def detect_keywords(cls):
-        if hasattr(cls,'_kw_fields'):return
         cls._kw_fields = {}
         for name in cls.__dict__:
             if name.startswith('parse_kw_'):
@@ -86,11 +65,9 @@ class Entry:
     def __init__(self,sheet,location,origin):
         self._impl = True
         self.bitfields = {}
-        self.superfields = {}
         self._sheet = sheet
         self._location = location
         self._origin = origin
-        self.detect_keywords()
     def area_name(self,area_mask):
         name = None
         for field_name in self.fields:
@@ -102,20 +79,60 @@ class Entry:
         name = field.lower()
         res  = self._kw_fields.get(name,None)
         if res is None:return False
-        elif res==field:getattr(self,'parse_kw_'+name)(start,end,width,mask)
+        elif res==field:getattr(self,'parse_kw_'+res)(start,end,width,mask)
         else:raise NameError('Keyword should be "%s", not "%s". At %s.'%(res,field,self.location))
         return True
     def parse_field(self,*args,**kwargs):
         if not self.impl:return True
         if self.parse_kw(*args,**kwargs):return True
         f = self.Field(self,*args,**kwargs)
-        if f.name in self.bitfields:raise NameError('Field "%s" is redefined in "%s". At %s.'%(f.name,self.name,self.location))
+        if f.name in self.bitfields:
+            raise NameError('Field "%s" is redefined in "%s". At %s.'%(f.name,self.name,self.location))
         self.bitfields[f.name] = f
-        if not f.name is f.super_name:self.superfields[f.super_name] = self.superfields.get(f.super_name,[]) + [f]
         setattr(self,'field_'+f.name,f)
         return True
     def parse_field_end(self):pass
     def commit(self,doc):doc.entries.append(self)
+    @staticmethod
+    def bool_property(name,default=False):
+        save = '_'+name
+        def get(self):
+            if hasattr(self,save):return getattr(self,save)
+            else:return default
+        def set(self,val):
+            setattr(self,save,True if val == 'Y' else False)
+        return property(get,set)
+    @staticmethod
+    def int_property(name,default=0):
+        save = '_'+name
+        def get(self):
+            if hasattr(self,save):return getattr(self,save)
+            else:return default
+        def set(self,val):setattr(self,save,int(val))
+        return property(get,set)
+    @staticmethod
+    def belonging_property(name):
+        def get(self):return self.sheet.name == name
+        return property(get)
+    @staticmethod
+    def encoded_property(name,encodes,default=0):
+        save = '_'+name
+        def get(self):
+            if hasattr(self,save):return getattr(self,save)
+            else:return default
+        def set(self,val):
+            if val!='':setattr(self,save,encodes[val])
+        return property(get,set)
+    @staticmethod
+    def named_property(name,default=''):
+        save = '_'+name
+        def get(self):
+            if hasattr(self,save):return getattr(self,save)
+            else:return default
+        def set(self,val):
+            if not isinstance(val,str):raise TypeError(type(val),val)
+            setattr(self,save,val.lower())
+        return property(get,set)
 class SheetParser:
     @property
     def doc(self):return self._doc
@@ -232,7 +249,7 @@ class SheetParser:
             entry = self.EntryParser(self,docloc,values)
             for name,col in self.name_cols.items():
                 setattr(entry,name,self._read_as_str(rowx,col))
-            
+            if not entry.impl:continue
             self.entries.append(entry)
             if self.bit_width <= 0:
                 entry.parse_field_end()
@@ -256,6 +273,7 @@ class SheetParser:
                     mask = 1<<loc
                     val = self._read_as_str(rowx,col)
                 val = val.strip()
+
                 entry.parse_field(loc_start,loc_end,width,mask,val)
                 mask_done |= mask
             entry.parse_field_end()
@@ -290,3 +308,4 @@ class BitDoc:
     def make(self,odir='./gen/',lib='targets',**kwargs):
         for name,ofname in kwargs.items():
             display(self.gen(name,lib=lib),odir+ofname if not ofname is None else None)
+        

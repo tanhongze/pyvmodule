@@ -79,32 +79,47 @@ class ControlBlock(ASTNode,NamingRecv):
         self._driver_checker = DriverChecker()
     def __getitem__(self,key):
         if isinstance(key,slice):
-            if key.start is None or not key.step is None:
-                raise SyntaxError('Should use format "When(cond)[y:x]" to generate "if(cond) begin y<=x; end" in verilog.')
             y = key.start
+            if not isinstance(y,ASTNode):raise TypeError(type(y))
+            typename = y.typename
             x = key.stop
-            if x is None:
-                if isinstance(self.body,Expr):self[y:self.body]
-                elif self.body is None:pass
-                else:self.body[y:]
-                if not self.next is None:self.next[y:]
+
+            if not key.step is None:
+                if x is None:
+                    for name in key.step:
+                        self[getattr(y,name):]
+                else:
+                    for name in key.step:
+                        self[getattr(y,name):getattr(x,name)]
+                return self
+            if typename == 'struct':
+                if x is None:
+                    for name,item in key._naming_var.items():
+                        self[item:]
+                else:
+                    for name,item in key._naming_var.items():
+                        if hasattr(x,name):self[item:getattr(x,name)]
             else:
-                # When(cond)[y:x]
-                if not isinstance(y,ASTNode):raise TypeError(type(y))
-                typename = y._typename
-                if typename == 'wire':raise TypeError('Control block cannot set value for wire "%s".'%str(y))
-                if typename == 'reg':
-                    target = y
-                    mask = (1<<len(y))-1
-                elif typename == '[]':
-                    target = y._get_target()
-                    mask   = y._range_mask
-                else:raise TypeError(typename)
-                target._append_controlblock(self)
-                x = wrap_expr(x)
-                x._fix_width(y)
-                self.assignments.append((y,x))
-                if self._driver_checker.add(id(target),mask):raise KeyError('Multi-driven signal "%s" is detected.'%y)
+                if x is None:
+                    if isinstance(self.body,Expr):self[y:self.body]
+                    elif self.body is None:pass
+                    else:self.body[y:]
+                    if not self.next is None:self.next[y:]
+                else:
+                    # When(cond)[y:x]
+                    if typename == 'wire':raise TypeError('Control block cannot set value for wire "%s".'%str(y))
+                    if typename == 'reg':
+                        target = y
+                        mask = (1<<len(y))-1
+                    elif typename == '[]':
+                        target = y._get_target()
+                        mask   = y._range_mask
+                    else:raise TypeError(typename)
+                    target._append_controlblock(self)
+                    x = wrap_expr(x)
+                    x._fix_width(y)
+                    self.assignments.append((y,x))
+                    if self._driver_checker.add(id(target),mask):raise KeyError('Multi-driven signal "%s" is detected.'%y)
         elif isinstance(key,ASTNode) and key.typename=='function':
             self.functions.append(key)
         else:

@@ -69,6 +69,7 @@ def seq_align_expr_area_match(mat,col,row,prev):
     return True
 def seq_align_expr_area_fit_padding(mat,col,top,cur):
     for i in range(top,cur):
+        if col >= len(mat[i]):continue
         word = mat[i][col]
         if word in padding_set:
             myindent = ' '*len(word)

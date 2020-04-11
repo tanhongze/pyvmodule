@@ -165,7 +165,7 @@ class Expr(ASTNode):
         self.width = None
     def _connect_port(self,m,p):
         if p.io!='input':raise KeyError('Assigning "%s" to %s port "%s"'%(str(self),p.io,str(p)))
-        val._fix_width(p)
+        self._fix_width(p)
 class UnaryOperator(Expr):
     def __init__(self,typename,rhs):
         self._set_default(typename)
@@ -354,7 +354,9 @@ class ConstExpr(Expr):
             elif not key.stop is None:return Hexadecimal(int(self)>>start,width=key.stop-start)
             return Hexadecimal(int(self)>>start,width=self.width-start)
         elif isinstance(key,(int,ConstExpr)):
-            return Binary((self.value>>int(key))&1,width=1)
+            loc = int(key)
+            if loc<0:loc += len(self)
+            return Binary((self.value>>loc)&1,width=1)
         elif isinstance(key,Expr):
             n = 1<<len(key)
             v = self.value
@@ -389,7 +391,15 @@ class ConstExpr(Expr):
         elif isinstance(other,int):return self.width is None and int(self)==other
         else:return False
     def __hash__(self):return int(self)+(0 if self.width is None else self.width)
-def Hexadecimal(x,width=None):return ConstExpr(x,width=width,radix=16)
-def Binary     (x,width=None):return ConstExpr(x,width=width,radix=2 )
-def Octal      (x,width=None):return ConstExpr(x,width=width,radix=8 )
-def Decimal    (x,width=None):return ConstExpr(x,width=width,radix=10)
+def Hexadecimal(x,width=None):
+    if width==0:return None
+    else:return ConstExpr(x,width=width,radix=16)
+def Binary     (x,width=None):
+    if width==0:return None
+    else:return ConstExpr(x,width=width,radix=2 )
+def Octal      (x,width=None):
+    if width==0:return None
+    else:return ConstExpr(x,width=width,radix=8 )
+def Decimal    (x,width=None):
+    if width==0:return None
+    else:return ConstExpr(x,width=width,radix=10)

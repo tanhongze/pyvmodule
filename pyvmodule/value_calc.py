@@ -144,12 +144,12 @@ def prop_mux(expr):
             elif (int(expr.lhs)^int(expr.rhs))==(1<<len(expr))-1:return (expr.cond**len(expr))^expr.rhs
             else:return expr
         else:
-            if int(expr.lhs)==0:return self.rhs.validif(~expr.cond)
-            elif expr.width==1:return expr.cond|self.rhs
+            if int(expr.lhs)==0:return expr.rhs.validif(~expr.cond)
+            elif expr.width==1:return expr.cond|expr.rhs
             else:return expr
     elif expr.rhs._is_constant:
-        if int(expr.rhs)==0:return self.lhs.validif(expr.cond)
-        elif expr.width==1:return (~expr.cond)|self.lhs
+        if int(expr.rhs)==0:return expr.lhs.validif(expr.cond)
+        elif expr.width==1:return (~expr.cond)|expr.lhs
         else:return expr
     else:return expr
 def prop_validif(expr):

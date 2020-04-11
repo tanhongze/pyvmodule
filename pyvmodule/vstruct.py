@@ -139,14 +139,23 @@ class VStruct(NamingNode):
         NamingNode.__init__(self,**kwargs)
         set_components(self,components)
     def __setitem__(self,key,val):
-        if not isinstance(key,slice) and key.start is None and key.stop is None and key.step is None:
-            raise TypeError(key)
-        if not isinstance(val,VStruct):
-            raise TypeError(val,type(val))
-        for key,val in val._naming_var.items():
-            target = self._naming_var.get(key,None)
-            if target is None:setattr(self,key,val)
-            else:target[:] = getattr(val,key)
+        if isinstance(key,slice):
+            if not isinstance(val,NamingNode):
+                raise TypeError(val,type(val))
+            if key.start is None and key.stop is None and key.step is None:
+                for name,target in self._naming_var.items():
+                    if hasattr(val,name):target[:] = getattr(val,name)
+            elif not key.start is None and not key.stop is None:
+                getattr(self,key.start)[:] = getattr(val,key.stop)
+            else:
+                raise TypeError('[%s:%s:%s]'%(key.start,key.stop,key.step))
+        elif isinstance(key,dict):
+            for tname,sname in key.items():
+                getattr(self,tname)[:] = getattr(val,sname)
+        elif isinstance(key,(list,set)):
+            for name in key:
+                getattr(self,name)[:] = getattr(val,name)
+        else:raise TypeError(key)
     def _node_clone(self):return VStruct(reverse=self._reverse,bypass=self._bypass)
     def __iter__(self):
         for name,var in self._naming_var.items():yield var

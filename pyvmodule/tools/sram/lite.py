@@ -45,6 +45,8 @@ class SRamIF(VStruct):
     def write(self):return self.en & self.wen.reduce_or()
     @property
     def read(self):return self.en &~self.wen.reduce_or()
+    @property
+    def address(self):return self.addr
 class MBridge(SRamIF):
     def __init__(self,*args,**kwargs):
         SRamIF.__init__(self,*args,**kwargs)
@@ -61,8 +63,8 @@ class MBridge(SRamIF):
         for i in range(len(self.sels)):
             sel |= self.sels[i]
             last|= self.sels[i].last
-        self.sel = Wire(sel)
-        self.sel.last = Wire(last)
+        self.sel = Wire(~sel)
+        self.sel.last = Wire(~last)
         return self._subtarget(io)
     def _subtarget(self,io):
         slave = SRamIF(pawidth=self.pawidth,nbyte=self.nbyte,io=io)

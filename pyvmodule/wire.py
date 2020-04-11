@@ -133,6 +133,7 @@ class Wire(Expr,NamingNode):
         if target.io == 'output':
             self._mark_driven()
             self._driver_port = (submodule,target)
+        self._fix_width(target)
     def _get_target(self):return self
     def _gen_target(self,key):
         if isinstance(key,tuple):

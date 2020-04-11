@@ -2,11 +2,12 @@ from .ast import ASTNode
 from .vmodule import VModuleMeta,VModuleHelper
 from .tools import viterator as viter
 class VCircuit:
-    def add_module_cascade(self,h,**kwargs):
+    def add_module_cascade(self,h,prefix=None,**kwargs):
         self.modules[h.name] = h
         for subm in h.modules:
             cls = type(subm)
             if not isinstance(cls,VModuleMeta):raise TypeError(cls)
+            if not prefix is None:cls.name = prefix+'_'+cls.name
             name = cls.name
             if cls.ip_only == True:continue
             if name in self.modules:
@@ -19,7 +20,7 @@ class VCircuit:
             self.add_module_cascade(helper,**kwargs)
     def save(self,**kwargs):
         getattr(self,'save_'+ASTNode.get_language())(**kwargs)
-    def save_verilog(self,dir=None): 
+    def save_verilog(self,dir=None,**kwargs): 
         if dir is None:
             for name,helper in self.modules.items():
                 print(helper.code)

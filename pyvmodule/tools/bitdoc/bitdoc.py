@@ -30,6 +30,14 @@ class Field:
         self.name  = field
         self.parse(field[len(self.name):])
     def parse(self,*args,**kwargs):pass
+def get_bin(t):
+    s = t.replace(' ','').replace('\n','').replace('\t','')
+    v = 0
+    for c in s:
+        v<<=1
+        if c =='1':v|=1
+        elif c!='0':raise ValueError(t)
+    return v
 class Entry:
     _name_force_lower = True
     @property
@@ -37,7 +45,8 @@ class Entry:
     @name.setter
     def name(self,name):
         self._name_origin = name
-        if self._name_force_lower:self._name = name.lower()
+        self._name = self._name_origin.replace(' ','').replace('.','_')
+        if self._name_force_lower:self._name = self._name.lower()
     @property
     def impl(self):return self._impl
     @impl.setter
@@ -109,6 +118,14 @@ class Entry:
             if hasattr(self,save):return getattr(self,save)
             else:return default
         def set(self,val):setattr(self,save,int(val))
+        return property(get,set)
+    @staticmethod
+    def binary_property(name,default=0):
+        save = '_'+name
+        def get(self):
+            if hasattr(self,save):return getattr(self,save)
+            else:return default
+        def set(self,val):setattr(self,save,get_bin(val))
         return property(get,set)
     @staticmethod
     def belonging_property(name):

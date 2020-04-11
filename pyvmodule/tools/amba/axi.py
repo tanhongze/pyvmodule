@@ -1,4 +1,29 @@
-from pyvmodule import *
+from pyvmodule.develope import *
+class ChannelAR(VStruct):
+    def __init__(self,bypass=True,**kwargs):
+        VStruct.__init__(self,bypass=bypass,**kwargs)
+class ChannelR(VStruct):
+    def __init__(self,bypass=True,**kwargs):
+        VStruct.__init__(self,bypass=bypass,**kwargs)
+class ChannelW(VStruct):
+    def __init__(self,,bypass=True**kwargs):
+        VStruct.__init__(self,bypass=bypass,**kwargs)
+class ChannelWR(VStruct):
+    def __init__(self,bypass=True,**kwargs):
+        VStruct.__init__(self,bypass=bypass,**kwargs)
+class ChannelB(VStruct):
+    def __init__(self,bypass=True,**kwargs):
+        VStruct.__init__(self,bypass=bypass,**kwargs)
+class Channel(VStruct):
+    def __init__(self,io='auto',bypass=True,**kwargs):
+        VStruct.__init__(self,bypass=bypass,**kwargs)
+        self.aclk    = Wire(io=io)
+        self.aresetn = Wire(io=io)
+        self.ar = ChannelAR(io=io)
+        self.r  = ChannelR (io=io)
+        self.w  = ChannelW (io=io)
+        self.wr = ChannelWR(io=io)
+        self.b  = ChannelB (io=io)
 class AXI:
     @property
     def l_arid   (self):return self.id

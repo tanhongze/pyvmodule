@@ -1,12 +1,11 @@
 from .ast import ASTNode
 from .vmodule import VModuleMeta,VModuleHelper
 class VCircuit:
-    def add_module_cascade(self,h,prefix=None,**kwargs):
+    def add_module_cascade(self,h,**kwargs):
         self.modules[h.name] = h
         for subm in h.modules:
             cls = type(subm)
             if not isinstance(cls,VModuleMeta):raise TypeError(cls)
-            if not prefix is None:cls.name = prefix+'_'+cls.name
             name = cls.name
             if cls.ip_only == True:continue
             if name in self.modules:

@@ -94,6 +94,7 @@ class VModuleMeta(NamingRoot):
     @language.setter
     def language(self,language):ASTNode.set_language(language)
     def __str__(self):return str(VModuleHelper(self))
+
 class VModuleHelper:
     @property
     def name(self):return self.module.name
@@ -109,14 +110,21 @@ class VModuleHelper:
         for name,var in items:
             if not isinstance(var,Wire):continue
             var._auto_port_determined()
-    def __init__(self,obj,**kwargs):
+    def __init__(self,obj,prefix=None,copyright=None,**kwargs):
+        if not prefix is None:obj.mod_name = prefix+'_'+obj.mod_name
+        if not copyright is None:obj.copyright.append(copyright)
         self.module = obj
         self.names = obj._naming_var.copy()
         if kwargs.get('enable_case_sensitivity',False):self.check_case_sensitivity()
         self.auto_port(self.names.items())
         self.clock = self.names.get('clock',None)
         self.extract()
-        self.code = self.gen()
+    @property
+    def code(self):
+        if hasattr(self,'_code'):return self._code
+        else:
+            self._code = self.gen()
+            return self._code
     def extract(self):
         self.rams = []
         self.ports = []

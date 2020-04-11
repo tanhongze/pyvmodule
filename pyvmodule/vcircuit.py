@@ -1,6 +1,5 @@
 from .ast import ASTNode
 from .vmodule import VModuleMeta,VModuleHelper
-from .tools import viterator as viter
 class VCircuit:
     def add_module_cascade(self,h,prefix=None,**kwargs):
         self.modules[h.name] = h

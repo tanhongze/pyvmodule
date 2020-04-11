@@ -1,4 +1,4 @@
-from .ast import ASTNode
+from pyvmodule.ast import ASTNode
 __all__ = ['expr_value_calc_funcs','expr_value_prop_funcs']
 def calc_bitwise_xor(expr):
     x = int(expr.rhs)

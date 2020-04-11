@@ -1,6 +1,6 @@
 __all__ = ['prepare_auto_connect']
 import warnings
-from . import viterator as viter
+from pyvmodule import viterator as viter
 from pyvmodule.wire import Wire
 def get_match_table(obj,pattern,io):
     if pattern.count('*')>1:raise ValueError('Too many "*" to match.')

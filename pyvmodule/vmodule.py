@@ -1,33 +1,13 @@
-#----------------------------------------------------------------------
-#pyvmodule:vmodule.py
-#
-#Copyright (C) 2019  Hong Ze Tan
-#
-#This program is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
-#
-#This program is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
-#
-#You should have received a copy of the GNU General Public License
-#along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#----------------------------------------------------------------------
-__all__ = ['VModule','VModuleMeta']
 import sys
-from .expr import *
+from .expr import wrap_expr
 from .wire import Wire
 from .ast import ASTNode
 from .naming import NamingDict,NamingRoot,NamingNode
-from .naming import a_name_valid
-from .tools.auto_connect import prepare_auto_connect
-from .tools.module.copy import meta_copy
-from .vstruct import VStruct,set_components
+from .compute.auto_connect import prepare_auto_connect
+from .compute.copy import meta_copy
 from .ctrlblk import ControlBlock,Initial
 import warnings
+__all__ = ['VModule','VModuleMeta','VModuleHelper']
 def name_getter(self,key):return self['_mod_name']
 def ip_only_getter(self,key):return self['_ip_only']
 def mydict_getter(self,key):return self

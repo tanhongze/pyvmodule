@@ -1,4 +1,4 @@
-from pyvmodule.basic import *
+from pyvmodule.develope import *
 from collections import defaultdict
 def divexp(n,i):
     return (n>>i)+(1 if (((1<<i)-1)&n) != 0 else 0)

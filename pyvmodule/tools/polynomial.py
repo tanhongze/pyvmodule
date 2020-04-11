@@ -1,3 +1,4 @@
+from .memorization import memorized
 __all__ = ['Polynomial']
 class PolynomialBase:
     def __or__(self,x):
@@ -74,6 +75,7 @@ class PolynomialBase:
             shift += 1
             mask <<= 1
         return x
+@memorized
 def Polynomial(deg,seed):
     if (seed&(1<<deg))!=0:seed^=(1<<deg)
     if type(deg)!=int:raise TypeError(type(deg))

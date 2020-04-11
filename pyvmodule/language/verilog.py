@@ -1,8 +1,6 @@
 __all__ = ['expr_generate_funcs','cblk_generate_funcs','inst_generate','decl_generate','meta_generate']
-from pyvmodule.tools import viterator as viter
-from .code_align import align_expr_area
-from .code_align import align_mat
-from .code_align import align_assign
+from pyvmodule import viterator as viter
+from .code_align import align_expr_area,align_mat,align_assign
 import warnings
 precedences_list = {
     0:('const','wire','reg','[]','{}','{{}}'),

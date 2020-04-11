@@ -1,6 +1,5 @@
 from .language import verilog
-from .language import firrtl
-langs = {'verilog':verilog,'firrtl':firrtl}
+langs = {'verilog':verilog}
 class ASTNode:
     _expr_generate_funcs = verilog.expr_generate_funcs
     _cblk_generate_funcs = verilog.cblk_generate_funcs

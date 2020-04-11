@@ -1,29 +1,8 @@
-#----------------------------------------------------------------------
-#pyvmodule:expr.py
-#
-#Copyright (C) 2019  Hong Ze Tan
-#
-#This program is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
-#
-#This program is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
-#
-#You should have received a copy of the GNU General Public License
-#along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#----------------------------------------------------------------------
+#-- coding:utf-8
 from .ast import ASTNode
-from .value_calc import expr_value_calc_funcs
-from .value_calc import expr_value_prop_funcs
-from .width_calc import expr_width_calc_funcs
-from .width_calc import expr_width_fix_funcs
-from .width_calc import expr_match_width
-from .width_calc import expr_calc_width
-from .exceptions import *
+from .compute.value import expr_value_calc_funcs,expr_value_prop_funcs
+from .compute.width import expr_width_calc_funcs,expr_width_fix_funcs
+from .compute.width import expr_match_width,expr_calc_width
 from .tools.utility import count_one
 import warnings
 __all__ = ['Mux','Concatenate','Expr','wrap_expr',
@@ -32,10 +11,11 @@ __all__ = ['Mux','Concatenate','Expr','wrap_expr',
 def wrap_expr(expr):
     if isinstance(expr,Expr):return expr
     elif isinstance(expr,int):return Hexadecimal(expr)
-    else:e_unhandled_type(expr)
+    else:raise TypeError('Cannot convert "%s" object into "Expr".'%type(expr))
 def propagated(func):
     def propagated_func(*args):
-        return func(*args)._prop_value()
+        res = func(*args)
+        return res if res is None else res._prop_value()
     return propagated_func
 class Expr(ASTNode):
     max_cols_per_line = 120
@@ -80,9 +60,9 @@ class Expr(ASTNode):
     def __init__(self):raise NotImplementedError()
     def __int__(self):return self._value_calc_func(self)
     def __len__(self):
-        if self.width is None:raise WidthError('"%s" with none-width'%str(self))
-        elif self.width>0:return self.width
-        else:e_width_nonpositive(self)
+        if self.width is None:raise ValueError('Getting width of width-free expr "%s".'%str(self))
+        if self.width <= 0   :raise ValueError('Found negative width in "%s".'%str(self))
+        return self.width
     @property
     def _is_constant(self):return False
     @property
@@ -99,7 +79,9 @@ class Expr(ASTNode):
     @propagated
     def __pos__(self):return self
     @propagated
-    def __pow__(self,rhs):return Replicate(self,rhs)
+    def __pow__(self,rhs):
+        if rhs ==0:return None
+        else:return Replicate(self,rhs)
     @propagated
     def __lt__ (self,rhs):return BinaryOperator('<',self,rhs)
     @propagated
@@ -278,9 +260,9 @@ class Replicate(UnaryOperator):
     def count(self):return self._count
     @count.setter
     def count(self,count):
-        if isinstance(count,ConstExpr):count=int(count)
-        a_value_positive(count,'count of replacation')
+        count=int(count)
         self._count = count
+        if count<=0:raise ValueError('Invalid replicate "%s".'%self)
     def __init__(self,rhs,count):
         self._set_default('{{}}')
         self.rhs = rhs
@@ -314,9 +296,8 @@ class ConstExpr(Expr):
     def value(self,value):
         if value is None:self._value = value
         else:
-            if isinstance(value,int):self._value = value
-            elif isinstance(value,str):self._value = self._convert_str(value)
-            else:e_unhandled_type(x)
+            if isinstance(value,str):self._value = self._convert_str(value)
+            else:self._value = int(value)
             if not self._width is None:self._value&=(1<<self._width)-1
     @property
     def width(self):return self._width
@@ -346,9 +327,9 @@ class ConstExpr(Expr):
         self.value = value
     def __getitem__(self,key):
         if isinstance(key,slice):
-            if not key.start is None and not isinstance(key.start,int):raise SyntaxError('Invalid fetch format from constant expression.') 
-            if not key.stop  is None and not isinstance(key.stop ,int):raise SyntaxError('Invalid fetch format from constant expression.') 
-            if not key.step  is None and not isinstance(key.step ,int):raise SyntaxError('Invalid fetch format from constant expression.') 
+            for a in {'start','stop','step'}:
+                if not isinstance(getattr(key,a),(int,type(None))):
+                    raise SyntaxError('Invalid fetch format from constant expression.') 
             start = 0 if key.start is None else key.start
             if not key.step is None:return Hexadecimal(int(self)>>start,width=key.step)
             elif not key.stop is None:return Hexadecimal(int(self)>>start,width=key.stop-start)
@@ -373,7 +354,7 @@ class ConstExpr(Expr):
                     for i in range(n):
                         if ((v>>i)&1)==0:expr&=~(key//i)
                 return expr
-        else:e_unhandled_type(key)
+        else:raise TypeError(type(key))
     def __str__(self):
         width = self.width
         value = self.value

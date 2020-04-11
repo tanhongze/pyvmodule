@@ -20,11 +20,3 @@ def clog2(x):
         c =c<<1
         n+=1
     return n
-def memorized(f):
-    result_cache = {}
-    def g(*args):
-        if args in result_cache:return result_cache[args]
-        val = f(*args)
-        result_cache[args] = val
-        return val
-    return g

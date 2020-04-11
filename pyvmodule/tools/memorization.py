@@ -1,4 +1,4 @@
-
+__all__ = ['memorized']
 def memorized(f):
     result_cache = {}
     def g(*args):

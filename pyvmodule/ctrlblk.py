@@ -1,9 +1,8 @@
 from .ast import ASTNode
 from .naming import NamingRecv
 from .expr import wrap_expr,Expr
-from .width_calc import expr_match_width
-from .width_calc import expr_calc_width
-from .tools.check.driver import ControlBlockDriverChecker as DriverChecker
+from .compute.width import expr_match_width,expr_calc_width
+from .compute.driver import ControlBlockDriverChecker as DriverChecker
 __all__ = ['ControlBlock','Always','Initial','AlwaysDelay','When']
 class ControlBlock(ASTNode,NamingRecv):
     _n_childs = ASTNode._controlblock_n_childs

@@ -1,9 +1,10 @@
+#-- coding:utf-8
 from .ast import ASTNode
 from .expr import Expr,wrap_expr,BinaryOperator,Concatenate
 from .naming import NamingNode
 from .ctrlblk import Always,When,Else,ControlBlock
-from .exceptions import a_value_positive,a_width_positive,e_unhandled_type
 __all__ = ['Index','Wire','Reg','Fetch']
+def e_unhandled_type(x):raise TypeError(type(x))
 class Wire(Expr,NamingNode):
     random_init = False
     def __str__(self):return self.name
@@ -32,7 +33,8 @@ class Wire(Expr,NamingNode):
         return self._width
     @width.setter
     def width(self,width):
-        a_width_positive(width,self)
+        width = int(width)
+        if width<=0:raise ValueError('Setting non-positive width %d for signal "%s".'%(width,str(self)))
         self._width = width
     @property
     def length(self):return 1
@@ -75,7 +77,7 @@ class Wire(Expr,NamingNode):
             else:
                 self.width = len(arg) if width is None else width
                 self[:] = arg
-        else:e_unhandled_type(arg)
+        else:raise TypeError('Passing positional argument "%s" with type "%s".'%(arg,type(arg)))
     def __init__(self,*args,width=None,name=None,io=None,expr=None,**pragmas):
         NamingNode.__init__(self,name=name)
         self._set_default('wire')
@@ -193,7 +195,8 @@ class Reg(Wire):
     def length(self):return self._length
     @length.setter
     def length(self,length):
-        a_value_positive(length,'depth of memory')
+        length = int(length)
+        if length<=0:raise ValueError('Setting non-positive length %d for signal "%s".'%(length,str(self)))
         if length>1 and not self.io is None:raise ValueError('RAM could not be port.')
         self._length = length
     @property

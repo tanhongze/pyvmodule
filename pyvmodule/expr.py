@@ -213,6 +213,11 @@ class XorOperator(AssociativeOperator):
         expr_calc_width(self,other)
         self._merge_childs(other)
         return self
+def fix_slice(key,width):
+    start = (0 if key.step is None else key.stop-key.step) if key.start is None else key.start
+    stop  = (width if key.step is None else key.start+key.start) if key.stop is None else key.stop
+    width = stop - start
+    return start,stop,width
 class Concatenate(AssociativeOperator):
     def _extract_childs(self,args):
         for arg in args:
@@ -224,13 +229,19 @@ class Concatenate(AssociativeOperator):
         self._extract_childs(args)
         self._calc_width()
     def __setitem__(self,key,val):
-        a_part_select_all(self,key)
+        if not isinstance(key,slice):raise TypeError(type(key))
+        expr_match_width(val,len(self))
+        start,stop,width = fix_slice(key,len(self))
         base = 0
         for expr in self.childs:
-            a_assignable(expr)
-            expr[:] = val[base::len(expr)]
+            if stop < base or start > base + len(expr):continue
+            if start > base:
+                expr[start-base:] = val[:base-start+len(expr)]
+            elif stop<base +len(expr):
+                expr[:stop-base] = val[-(stop-base):]
+            else:
+                expr[:] = val[base-start::len(expr)]
             base += len(expr)
-        expr_match_width(val,base)
 class ValidIf(BinaryOperator):
     def __init__(self,lhs,rhs):
         self._set_default('validif')

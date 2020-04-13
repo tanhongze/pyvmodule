@@ -117,7 +117,10 @@ class VModuleHelper:
         self.names = obj._naming_var.copy()
         if kwargs.get('enable_case_sensitivity',False):self.check_case_sensitivity()
         self.auto_port(self.names.items())
-        self.clock = self.names.get('clock',None)
+        if hasattr(self.module,'clock'):
+            self.clock = getattr(self.module,'clock')
+        else:
+            self.clock = None
         self.extract()
     @property
     def code(self):

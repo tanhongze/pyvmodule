@@ -183,6 +183,8 @@ class NamingDict(dict):
     def _naming_ssa(self):return self['_naming_ssa']
     @property
     def _naming_var(self):return self['_naming_var']
+    @property
+    def _naming_recv(self):return self['_naming_recv']
     __setitem__ = naming_setattr(dict.__getitem__)
     def __init__(self,prev):
         self['_naming_ssa']  = set()  if '_naming_ssa'  not in prev else prev['_naming_ssa']

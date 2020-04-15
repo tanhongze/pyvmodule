@@ -47,6 +47,14 @@ class SRamIF(VStruct):
     def read(self):return self.en &~self.wen.reduce_or()
     @property
     def address(self):return self.addr
+    @property
+    def write_address(self):return self.addr
+    @property
+    def read_address(self):return self.addr
+    @property
+    def write_data(self):return self.wdata
+    @property
+    def read_data(self):return self.rdata
 class MBridge(SRamIF):
     def __init__(self,*args,**kwargs):
         SRamIF.__init__(self,*args,**kwargs)

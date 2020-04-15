@@ -78,8 +78,9 @@ class Wire(Expr,NamingNode):
                 self.width = len(arg) if width is None else width
                 self[:] = arg
         else:raise TypeError('Passing positional argument "%s" with type "%s".'%(arg,type(arg)))
-    def __init__(self,*args,width=None,name=None,io=None,expr=None,**pragmas):
-        NamingNode.__init__(self,name=name)
+    def __init__(self,*args,width=None,name=None,io=None,expr=None,\
+            reverse=False,bypass=False,mounting=True,**pragmas):
+        NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass,mounting=mounting)
         self._set_default('wire')
         self.io = io
         self._receive_args(args,width,expr)
@@ -203,8 +204,9 @@ class Reg(Wire):
     def assignment(self):raise TypeError('Cannot get assignment of registers.')
     @assignment.setter
     def assignment(self,expr):raise TypeError('Cannot set assignment for registers.')
-    def __init__(self,*args,width=None,length=1,name=None,io=None,expr=None,**pragmas):
-        NamingNode.__init__(self,name=name)
+    def __init__(self,*args,width=None,length=1,name=None,io=None,expr=None,\
+            reverse=False,bypass=False,mounting=True,**pragmas):
+        NamingNode.__init__(self,name=name,reverse=reverse,bypass=bypass,mounting=mounting)
         self._set_default('reg')
         self._clock = None
         self._length = 1

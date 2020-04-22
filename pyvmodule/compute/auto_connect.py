@@ -46,7 +46,7 @@ def prepare_auto_connect_funcs(hasval,getval,setval):
                 pval = getval(env,p)
                 if not isinstance(pval,Wire):raise TypeError('"%s" variable "%s" in parent is not a wire.'%(type(pval),p))
             else:
-                port = m.mydict[k]
+                port = getattr(m,k)
                 pval = type(port)(width=len(port),name=p,io=io)
                 setval(env,p,pval)
             setattr(m,k,pval)

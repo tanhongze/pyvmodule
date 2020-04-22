@@ -1,19 +1,21 @@
 #coding=utf-8
 from pyvmodule.develope import VStruct,Wire,Reg,ctrlblk
 from .bitdoc import BitDoc,Entry,Field
-__all__ = ['CsrDoc','CsrEntry']
+__all__ = ['CsrDoc','CsrEntry','CsrField']
 class CsrField(Field):
+    default_value = None
     rw_allowed = {'r','rr','rc','rw'}
     @property
     def rw(self):return self._rw
     @rw.setter
     def rw(self,rw):
         rw = rw.lower()
-        if rw not in self.rw_allowed:raise ValueError('Invilad RW property "%s"'%rw)
+        if rw not in self.rw_allowed:
+            self.raise_error('Invilad RW property "%s".'%rw)
         self._rw = rw
     def __init__(self,*args,**kwargs):
         self.rw   = 'rw'
-        self.value= None
+        self.value= self.default_value
         self.export = False
         Field.__init__(self,*args,**kwargs)
     def parse(self,tail):
@@ -25,16 +27,23 @@ class CsrField(Field):
         text = parts[0]
         parts = text.split('=')
         if len(parts)> 2:raise ValueError(tail)
-        if len(parts)<=1:return
+        if len(parts)<=1:
+            parts = text.split(':')
+            if len(parts)> 2:raise ValueError(tail)
+            if len(parts)<=1:return
+            self.rw = 'RC'
+            exec('self.value = '+parts[1])
+            return
         # <rw>:<val>
         text = parts[1]
         parts = text.split(':')
         if len(parts)> 2:raise ValueError(tail)
         self.rw = parts[0].strip()
         if len(parts)<=1:return
-        self.value = int(parts[1])
+        exec('self.value = '+parts[1])
 class CsrEntry(Entry):
     export = Entry.bool_property('export')
+    id     = Entry.int_property('id')
     def parse_kw_Extend(self,start,end,width,mask):
         if len(self.area_extend)>0:raise ValuError('Multiple "Extend" area.')
         self.mask_extend  |=mask
@@ -61,8 +70,8 @@ class CsrDoc(BitDoc):
     def csr_cls(self):
         class CSR(VStruct):
             entries = self.entries
-            def read_with(self,raddr):
-                rdata = Wire(self.entries[0].bit_width)
+            def read_with(self,raddr,io=None):
+                rdata = Wire(self.entries[0].bit_width,io=io)
                 rdata.hit = VStruct()
                 r = 0
                 for entry in self.entries:
@@ -97,7 +106,7 @@ class CsrDoc(BitDoc):
                             continue
                         blk = ctrlblk
                         if not field.value is None:
-                            blk = blk.When(reset)[f:0]
+                            blk = blk.When(reset)[f:field.value]
                         if field.rw == 'rw':
                             blk = blk.When(csr.write)[f:wdata[field.start:field.end]]
                         f.blk = blk
@@ -121,8 +130,6 @@ class CsrDoc(BitDoc):
                             csr[start:end] = 0
                         if start==0:csr[start:end] = 0
                         extend_start = start
-                    
-                    if entry.mask_extend:csr[self.extend_start:] = csr[self.extend_start-1]**(entry.bit_width-self.extend_start)
                     for name,field in entry.bitfields.items():
                         if field.rw=='r':
                             f = Reg (field.width,io='output' if field.export else None)

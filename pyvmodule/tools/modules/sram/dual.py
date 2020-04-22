@@ -26,14 +26,14 @@ class SRamR(SRamRW):
                 ('data',self.dwidth),
                 ('en'  ,1),]
         return self._signals
-    def subtarget(self,base,depth):
+    def subtarget(self,base,depth,slave):
         self.sel = Wire(self.addr[depth:].equal_to(base>>depth))
         self.sel.last = Reg()
-        self.sel.last[:] = self.sel
-        return self.sel
+        self.sel.last[:] = When(self.en)[self.sel]
+        self.resend(slave)
     def endtarget(self):
         self.data[:] = self.data.so_far
-    def remaining(self,io=None,**kwargs):
+    def remaining(self,slave):
         sel = 0
         last = 0
         for i in range(len(self.sels)):
@@ -41,6 +41,7 @@ class SRamR(SRamRW):
             last|= self.sels[i].last
         self.sel = Wire(~sel)
         self.sel.last = Wire(~last)
+        self.resend(slave)
     def resend(self,slave):
         slave.en  [:] = self.en & self.sel
         slave.addr[:] = self.addr
@@ -55,19 +56,21 @@ class SRamW(SRamRW):
                 ('strb',self.bwidth),
                 ('en'  ,1),]
         return self._signals
-    def subtarget(self,base,depth):
+    def subtarget(self,base,depth,slave):
         self.sel = Wire(self.addr[depth:].equal_to(base>>depth))
-    def remaining(self,io=None,**kwargs):
+        self.resend(slave)
+    def remaining(self,slave):
         sel = 0
         for i in range(len(self.sels)):
             sel |= self.sels[i]
         self.sel = Wire(~sel)
+        self.resend(slave)
     def resend(self,slave):
         slave.en  [:] = self.en & self.sel
         slave.data[:] = self.data
         slave.strb[:] = self.strb
         slave.addr[:] = self.addr
-class SRam(VStruct):
+class SRam(Reg):
     @staticmethod
     def load_init(mem,dat):
         if dat is None:return
@@ -77,20 +80,20 @@ class SRam(VStruct):
             mem.readinit = Initial()[vfunction.readmemh(dat,mem)]
         else:raise NotImplementedError(dat)
     def __init__(self,r,w,level,dat=None,**kwargs):
-        VStruct.__init__(self,**kwargs)
+        Reg.__init__(self,width=r.dwidth,length=1<<(level-r.blevel),**kwargs)
+        self.load_init(self,dat)
         self.r = r
         self.w = w
-        self.mem  = Reg(width=r.dwidth,length=1<<(level-r.blevel))
-        self.load_init(self.mem,dat)
+        self.rdata = Reg(r.dwidth)
+        self.raddr = Wire(r.addr[r.blevel:level])
+        self.waddr = Wire(w.addr[r.blevel:level])
+        When(self.r.en)[self.rdata:self[self.raddr]]
+        self.r.data[:] = self.rdata
 
-        self.mem.rdata = Reg(r.dwidth)
-        When(self.r.en)[self.mem.rdata:self.mem[self.r.addr]]
-        self.r.data[:] = self.mem.rdata
-
-        self.mem.wdata = Wire(len(self.w.data))
+        self.wdata = Wire(len(self.w.data))
         for i in range(len(self.w.strb)):
-            self.mem.wdata[i*8::8] = self.w.strb[i].mux(self.w.data[i*8::8],self.mem[self.w.addr][i*8::8])
-        When(self.w.en)[self.mem[self.w.addr]:self.mem.wdata]
+            self.wdata[i*8::8] = self.w.strb[i].mux(self.w.data[i*8::8],self[self.waddr][i*8::8])
+        When(self.w.en)[self[self.waddr]:self.wdata]
 class SRamIF(VStruct):
     @property
     def awidth(self):return self.r.awidth
@@ -111,21 +114,16 @@ class SRamIF(VStruct):
     def response_zero(self):
         self.r.data[:] = 0
     def subtarget(self,base,depth,io=None):
-        self.r.subtarget(base,depth)
-        self.w.subtarget(base,depth)
-        return self._subtarget(io)
-    def endtarget(self):
-        self.r.endtarget()
-    def remaining(self,io=None,**kwargs):
-        self.r.remaining()
-        self.w.remaining()
-        slave = self._subtarget(io)
-        self.endtarget()
-        return slave
-    def _subtarget(self,io):
         slave = SRamIF(awidth=self.awidth,bwidth=self.bwidth,io=io)
-        self.r.resend(slave.r)
-        self.w.resend(slave.w)
+        self.r.subtarget(base,depth,slave.r)
+        self.w.subtarget(base,depth,slave.w)
+        return slave
+    def endtarget(self):self.r.endtarget()
+    def remaining(self,io=None):
+        slave = SRamIF(awidth=self.awidth,bwidth=self.bwidth,io=io)
+        self.r.remaining(slave.r)
+        self.w.remaining(slave.w)
+        self.endtarget()
         return slave
     @property
     def active(self):return self.r.en|self.w.en

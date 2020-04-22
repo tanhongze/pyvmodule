@@ -170,7 +170,7 @@ class Wire(Expr,NamingNode):
         if self._driven==0:return '// unconnected'
         locs = []
         for i in range(len(self)):
-            if (self._driven>>i)&1:locs.append(str(i))
+            if ((self._driven>>i)&1)==0:locs.append(str(i))
         return '// unconnected, at bit'+','.join(locs)
     def _auto_port_determined(self):
         if self.io=='auto':
@@ -315,10 +315,11 @@ class Index(ASTNode):
                     self.typename = 'range'
                     if key.start is None:
                         self.stop  = repair_const_type(int(key.stop),width,1)
-                        self.start = self.stop  - self.width
+                        self.start = repair_const_type(self.stop  - self.width,width,0)
                     else:
                         self.start = repair_const_type(int(loc),width,0)
-                        self.stop  = self.start + self.width
+                        self.stop  = repair_const_type(self.start + self.width,width,1)
+                    self.width = self.stop - self.start
                 elif isinstance(loc,Expr):
                     self.typename = '-:' if key.start is None else '+:'
                     self.start = start

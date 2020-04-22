@@ -2,7 +2,7 @@ __all__ = ['NamingNode','NamingDict','NamingRoot','NamingRecv','a_name_valid']
 from .ast import ASTNode
 import warnings
 def raise_error(err):raise err
-keywords = {'begin','end','always','initial','generate','endgenerate','if','else','for',
+keywords = {'begin','end','always','initial','generate','endgenerate','if','else','for','wait','fork','join'
     'genvar','integer','wire','reg','module','endmodule','input','output','inout','assign','case','endcase','force'}
 def a_name_type(name):return isinstance(name,str) or raise_error(NameError('Type of name must be type "str", not "%s".'       %(type(name))))
 def a_name_len (name):return len(name)<=32        or raise_error(NameError('Name "%s" is too long.(longer than %d characters)'%(name,32)))

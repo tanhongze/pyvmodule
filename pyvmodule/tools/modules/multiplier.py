@@ -73,7 +73,7 @@ class MultiplierRoot(VStruct):
         self.a = a
         self.b = b
         self.sign = sign
-        self.enc = BoothEncode(widthx=len(a)) if enc is None else enc
+        self.enc = BoothEncode(widtha=len(a)) if enc is None else enc
         self.enc.generated_with(a,b,sign)
         self.enable_ssa('z')
         for i in range(self.num+2):

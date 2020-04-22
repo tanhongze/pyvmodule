@@ -4,17 +4,18 @@ import os
 __all__ = ['Field','Entry','SheetParser','BitDoc']
 class Field:
     _name_force_lower = True
+    def raise_error(self,msg):
+        raise ValueError('%s At %s.'%(msg,self.entry.location))
     @property
     def name(self):return self._name
     @name.setter
     def name(self,name):
-        if name=='':
-            raise NameError('Empty name in "%s". At %s.'%(self.entry.name,self.entry.location))
+        if name=='':self.raise_error('Empty name in "%s".'%self.entry.name)
         if not name[0].isidentifier():
-            raise NameError('Name "%s"  is invalid in "%s". At %s.'%(self.field,self.entry.name,self.entry.location))
+            raise NameError('Name "%s" is invalid in "%s". At %s.'%(self.field,self.entry.name,self.entry.location))
         for i in range(1,len(name)):
             c = name[i]
-            if not c.isalnum() or c in {'_'}:
+            if not c.isalnum() and c !='_':
                 self._name_origin = name[:i]
                 break
         else:
@@ -53,7 +54,9 @@ class Entry:
     def impl(self,impl):
         if impl == 'Y':self._impl = True
         elif impl == 'N':self._impl = False
-        else:raise TypeError()
+        else:
+            print(str(impl))
+            raise ValueError(self.location)
     @property
     def sheet(self):return self._sheet
     @property
@@ -117,7 +120,7 @@ class Entry:
         def get(self):
             if hasattr(self,save):return getattr(self,save)
             else:return default
-        def set(self,val):setattr(self,save,int(val))
+        def set(self,val):setattr(self,save,int(val) if val!='' else default)
         return property(get,set)
     @staticmethod
     def binary_property(name,default=0):
@@ -125,7 +128,7 @@ class Entry:
         def get(self):
             if hasattr(self,save):return getattr(self,save)
             else:return default
-        def set(self,val):setattr(self,save,get_bin(val))
+        def set(self,val):setattr(self,save,get_bin(val) if val!='' else default)
         return property(get,set)
     @staticmethod
     def belonging_property(name):
@@ -138,7 +141,7 @@ class Entry:
             if hasattr(self,save):return getattr(self,save)
             else:return default
         def set(self,val):
-            if val!='':setattr(self,save,encodes[val])
+            setattr(self,save,encodes[val] if val!='' else default)
         return property(get,set)
     @staticmethod
     def named_property(name,default=''):

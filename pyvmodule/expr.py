@@ -139,6 +139,12 @@ class Expr(ASTNode):
     def __ror__(self,lhs) :return wrap_expr(lhs)|self
     def __rxor__(self,lhs):return wrap_expr(lhs)^self
     def __rfloordiv__(self,lhs):return wrap_expr(lhs)//self
+    @staticmethod
+    def full_adder_c(a,b,c):
+        return a&b|a&c|b&c
+    @staticmethod
+    def full_adder_s(a,b,c):
+        return a^b^c
     def _set_default(self,typename,n_childs=0):
         self.comments = []
         self.typename = typename

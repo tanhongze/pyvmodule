@@ -87,6 +87,9 @@ class ControlBlock(ASTNode,NamingRecv):
                 if x is None:
                     for name in key.step:
                         self[getattr(y,name):]
+                elif isinstance(key.step,dict):
+                    for tname,sname in key.step.items():
+                        self[getattr(y,tname):getattr(x,sname)]
                 else:
                     for name in key.step:
                         self[getattr(y,name):getattr(x,name)]

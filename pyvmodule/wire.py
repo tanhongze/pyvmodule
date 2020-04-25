@@ -403,3 +403,17 @@ class Fetch(BinaryOperator):
     def _get_target(self):
         if self.lhs._typename == '[]':return self.lhs.lhs
         else:return self.lhs
+        
+### add more complicated circuit method
+
+def x_equal_to_sum(self,*others):
+    if len(others)==1:
+        return self.equal_to(others[0])
+    if len(others)==2:
+        res = Wire()
+        res.c = Wire(self.full_adder_c(~self,*others))
+        res.s = Wire(self.full_adder_s(~self,*others))
+        res[:] = res.s[0] & (res.c[:-1]^res.s[1:]).reduce_and()
+        return res
+    raise NotImplementedError('Not implemented yet.')
+Expr.equal_to_sum = x_equal_to_sum

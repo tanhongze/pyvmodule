@@ -7,45 +7,55 @@ class VFunction(ASTNode):
     def name(self):return self._name
     @name.setter
     def name(self,name):self._name = name
-    def __init__(self,name,*args):
+    def __init__(self,name,*args,cond=None,delay=None):
         self.name = name
         self.args = args
+        self.cond = cond
+        self.delay = delay
     def _generate(self,indent=0):
-        contents = [[' '*indent,'$',self.name]]
+        contents = []
+        if not self.delay is None:
+            contents.append([' '*indent,'#',str(self.delay)])
+        if not self.cond is None:
+            contents.append([' '*indent,'if','(',str(self.cond),')'])
+            contents.append([' '*indent,'begin'])
+        contents.append([' '*(indent if self.cond is None else indent+4),'$',self.name])
         if len(self.args)==0:return contents
         contents[-1].append('(')
         contents[-1].append(','.join([('"%s"'%arg if isinstance(arg,str) else str(arg)) for arg in self.args]))
         contents[-1].append(')')
+        if not self.cond is None:
+            contents.append([' '*indent,'end'])
         return contents
-def display   (*args ):return VFunction('display',*args)
-def monitor   (*args ):return VFunction('monitor',*args)
-def strobe    (*args ):return VFunction('strobe' ,*args)
-def write     (*args ):return VFunction('write'  ,*args)
-def fopen     (*args ):return VFunction('fopen'  ,*args)
-def fclose    (*args ):return VFunction('fclose' ,*args)
-def monitoron (      ):return VFunction('monitoron')
-def monitoroff(      ):return VFunction('monitoroff')
-def time      (      ):return VFunction('time')
-def stime     (      ):return VFunction('stime')
-def realtime  (      ):return VFunction('realtime')
-def stop      (n=None):return VFunction('stop') if n is None else VFunction('stop',n)
-def finish    (n=None):return VFunction('finish') if n is None else VFunction('finish',n)
-def readmemb  (*args ):return VFunction('readmemb',*args)
-def readmemh  (*args ):return VFunction('readmemh',*args)
-def random    (      ):return VFunction('random')
-def timeformat(*args ):return VFunction('timeformat',*args)
-def printtimescale(*args):return VFunction('printtimescale',*args)
-def realtobits(*args):return VFunction('realtobits',*args)
-def bitstoreal(*args):return VFunction('bitstoreal',*args)
-def rtoi      (*args):return VFunction('rtoi',*args)
-def itor      (*args):return VFunction('itor',*args)
-def dumpfile  (fname):return VFunction('dumpfile',fname)
-def dumpvars  (*args):return VFunction('dumpvars',*args)
-def dumpoff   (*args):return VFunction('dumpoff',*args)
-def dumpon    (*args):return VFunction('dumpon',*args)
-def dumpall   (*args):return VFunction('dumpall',*args)
-def dumplimit (*args):return VFunction('dumplimit',*args)
-def dumpflush (*args):return VFunction('dumpflush',*args)
+def display   (*args,**kwargs):return VFunction('display',*args,**kwargs)
+def monitor   (*args,**kwargs):return VFunction('monitor',*args,**kwargs)
+def strobe    (*args,**kwargs):return VFunction('strobe' ,*args,**kwargs)
+def write     (*args,**kwargs):return VFunction('write'  ,*args,**kwargs)
+def fopen     (*args,**kwargs):return VFunction('fopen'  ,*args,**kwargs)
+def fclose    (*args,**kwargs):return VFunction('fclose' ,*args,**kwargs)
+def monitoron (      **kwargs):return VFunction('monitoron',**kwargs)
+def monitoroff(      **kwargs):return VFunction('monitoroff',**kwargs)
+def time      (      **kwargs):return VFunction('time',**kwargs)
+def stime     (      **kwargs):return VFunction('stime',**kwargs)
+def realtime  (      **kwargs):return VFunction('realtime',**kwargs)
+def stop      (n=None,**kwargs):return VFunction('stop',**kwargs) if n is None else VFunction('stop',n,**kwargs)
+def finish    (n=None,**kwargs):return VFunction('finish',**kwargs) if n is None else VFunction('finish',n,**kwargs)
+def readmemb  (*args,**kwargs):return VFunction('readmemb',*args,**kwargs)
+def readmemh  (*args,**kwargs):return VFunction('readmemh',*args,**kwargs)
+def random    (      **kwargs):return VFunction('random',**kwargs)
+def timeformat(*args,**kwargs):return VFunction('timeformat',*args,**kwargs)
+def printtimescale(*args,**kwargs):return VFunction('printtimescale',*args,**kwargs)
+def realtobits(*args,**kwargs):return VFunction('realtobits',*args,**kwargs)
+def bitstoreal(*args,**kwargs):return VFunction('bitstoreal',*args,**kwargs)
+def rtoi      (*args,**kwargs):return VFunction('rtoi',*args,**kwargs)
+def itor      (*args,**kwargs):return VFunction('itor',*args,**kwargs)
+def dumpfile  (fname,**kwargs):return VFunction('dumpfile',fname,**kwargs)
+def dumpvars  (*args,**kwargs):return VFunction('dumpvars',*args,**kwargs)
+def dumpoff   (*args,**kwargs):return VFunction('dumpoff',*args,**kwargs)
+def dumpon    (*args,**kwargs):return VFunction('dumpon',*args,**kwargs)
+def dumpall   (*args,**kwargs):return VFunction('dumpall',*args,**kwargs)
+def dumplimit (*args,**kwargs):return VFunction('dumplimit',*args,**kwargs)
+def dumpflush (*args,**kwargs):return VFunction('dumpflush',*args,**kwargs)
 
 def clog2(x,dynamic=False):
     if isinstance(x,ASTNode) and x.typename=='const':x = int(x)

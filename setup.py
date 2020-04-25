@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 from distutils.core import setup
 setuptools.setup(
     name="pyvmodule",
-    version="2.0.5",
+    version="2.0.6",
     author="H.Z.Tan",
     author_email="tanhongze@loongson.cn",
     description="pyvmodule:an advanded verilog coding toolkit",

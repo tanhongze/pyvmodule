@@ -1,5 +1,5 @@
 from pyvmodule.develope import *
-__all__ = ['Dividor']
+__all__ = ['DivUnit1','DivUnit2']
 class DividorI(Wire):
     def __init__(self,a,sign,**kwargs):
         Wire.__init__(self,width=len(a),expr=a,**kwargs)
@@ -7,97 +7,89 @@ class DividorI(Wire):
         self.abs  = Wire(self.sign.mux(~self+1,self))
         self.abs.near = Wire((self.sign**self.width)^self)
 class DivUnit1(VStruct):
+    '''___
+   a->|DIV|->r(.,.sign)
+   b->|   |->q(.,.sign)
+sign->| 1 |->d
+      |   |->phase
+      |___|->present(.,.r,.q)
+    '''
+    def z(self,width):
+        if width <0:return Hexadecimal(0,width=len(self.a)+width)
+        else:return Hexadecimal(0,width=width)
+    def p(self,value):
+        return Hexadecimal(value,width=6)
+    def is_same(self,c,d,r_sign,q_sign):
+        same = self.r.sign.equal_to(r_sign)
+        same&= self.q.sign.equal_to(q_sign)
+        same&= self.a.abs.equal_to(c)
+        same&= self.b.abs.equal_to(d)
+        return Wire(same)
     def __init__(self,a,b,sign,io=None,opt_locs=[12,4],**kwargs):
         VStruct.__init__(self,**kwargs)
-        self.a = DividorI(sign,a)
-        self.b = DividorI(sign,b)
-        self.q  = Wire(self.a.equal_to(0)|self.b[1:].equal_to(0)|self.b.sign&self.b[:-1].equal_to(-1))
-        self.r  = Wire(self.a.abs.near<self.b.abs.near) 
-        self.x  = Wire(self.q|self.r)
-        self.enable_ssa('loc')
-        self.enable_ssa('sft')
-        near_a = self.a.abs.near
-        near_b = self.b.abs.near
-        self.best  = Wire(self.a.abs.validif(self.enter.q)*self.a.abs.validif(self.enter.r&~self.enter.q))
-        self.worst = Wire(Hexadecimal(0,width=1)*self.a.abs*Hexadecimal(0,width=self.width-1))
+        self.a = DividorI(a,sign)
+        self.b = DividorI(b,sign)
         
-        Hex    = Hexadecimal
-        pwidth = clog2(len(self.a))
-        locs   = sorted(locs,reverse=True)
+        self.present = Wire(self.a.equal_to(0)|self.b[1:].equal_to(0)|self.b.sign&self.b[:-1].equal_to(-1))
+        self.present.r = Wire(expr=Hexadecimal(0,width=len(a)))
+        self.present.q = Wire(self.b.sign.mux(self.a.neg,self.a))
+        
+        self.d = Wire(self.b.abs)
+        self.r = Wire(len(self.a))
+        self.q = Wire(len(self.a))
+        self.r.sign = Wire(self.a.sign)
+        self.q.sign = Wire(self.a.sign^self.b.sign)
+        self.enable_ssa('loc')
+        opt_locs   = sorted(opt_locs,reverse=True)
  
-        phase = Hex(self.width-1,width=pwidth)
-        sft   = self.enter.worst
-        for loc in locs:
-            if loc < 1 or loc>=self.width:
+        self.q.val = self.z(1)*self.a.abs[:-1]
+        self.r.val = self.a.abs[-1]*self.z(len(self.a)-1)
+        self.phase = self.p(len(self.a)-1)
+        for loc in opt_locs:
+            if loc < 1 or loc>=len(self.a):
                 print('Invalid optimize configuration, ignored.')
                 continue
-            self.loc = Wire((near_a[loc:]<near_b[:-loc])|near_b[-loc:].reduce_or())
-            self.sft = Wire(Hex(0,width=self.width-loc)*self.a.abs*Hex(0,width=loc))
-            phase = self.enter.loc.mux(Hex(loc,width=pwidth),phase)
-            sft   = self.enter.loc.mux(self.enter.sft,sft)
-        self.val   = Wire(sft.validif(~self.enter.x)|self.enter.best)
-        self.phase = Wire(phase.validif(~self.enter.x))
+            self.loc = Wire((self.a.abs.near[loc:]<self.b.abs.near[:-loc])|self.b.abs.near[-loc:].reduce_or())
+            self.q.val = self.loc.mux(self.z(-loc)*self.a.abs[:loc],self.q.val)
+            self.r.val = self.loc.mux(self.a.abs[loc:]*self.z(+loc),self.r.val)
+            self.phase = self.loc.mux(self.p(loc),self.phase)
+        self.loc = Wire(self.a.abs.near<self.b.abs.near)
+        self.q.val = self.loc.mux(self.z(len(self.a)),self.q.val)
+        self.r.val = self.loc.mux(self.a.abs,self.r.val)
+        self.phase = self.loc.mux(self.p(0),self.phase)
+        self.q[:] = self.q.val
+        self.r[:] = self.r.val
+        self.phase = Wire(self.phase)
 class DivUnit2(VStruct):
-    def __init__(self,a,b,sign,io=None,opt_locs=[12,4],**kwargs):
+    '''      ___
+r(.,.sign)->|DIV|->update(.phase,.r,.q)
+q(.,.sign)->|   |->present(.,.r,.q)
+         d->| 2 |
+     phase->|___|
+    '''
+    sel_encodes = {
+        'r':0x0,
+        'q':0x1}
+    def sel_res(self,sel):
+        return Wire(sel.mux(self.present.q,self.present.r))
+    def __init__(self,r,q,d,phase,io=None,**kwargs):
         VStruct.__init__(self,**kwargs)
-    
-        self.phase = Reg(pwidth)
-        self.phase.last = Wire(self.phase.equal_to(0))
-        self.phase.next = Wire((self.phase-1).validif(~self.phase.last))
-        self.divisor  = Reg(self.width)
-        self.buffer   = Reg(self.width*2)
-        self.buffer.addq = Wire(self.width*2)
-        self.buffer.next = Wire(self.width*2)
-        self.dividend = Wire(self.buffer[self.width:])
-        self.partial  = Wire(self.buffer[:self.width])
+        self.r = Wire(r)
+        self.q = q
+        self.d = d
+        self.last = Wire(phase.equal_to(0))
+        self.update = VStruct()
         
-        self.divisor .ext = Wire(self.divisor *Binary(0,width=1))
-        self.dividend.ext = Wire(self.dividend*Binary(0,width=1))
-        self.dividend.sub = Wire(self.dividend.ext - self.divisor .ext)
-        self.dividend.ltd = Wire(self.dividend.sub[-1])
-        self.r = Wire(self.width,io=io)
-        self.q = Wire(self.width,io=io)
-        self.r.sign = Reg()
-        self.q.sign = Reg()
+        self.r.sub = Wire(self.r*Binary(0,width=1) - self.d*Binary(0,width=1))
+        self.r.ged = Wire(~self.r.sub[-1])
+        self.r.next= Wire(self.r.ged.mux(self.r.sub[:-1],self.r))
         
-        self.buffer.addq[0] = ~self.dividend.ltd
-        self.buffer.addq[1:self.width]= self.partial[1:]
-        self.buffer.addq[self.width: ]= self.dividend.ltd.mux(self.dividend,self.dividend.sub[:-1])
-        self.buffer.next[:] = self.phase.last.mux(self.buffer.addq,Binary(0,width=1)*self.buffer.addq[:-1])
-        
-        self.finish[:] = self.work&self.done|self.work&self.phase.equal_to(0)&self.dividend.ltd
-        self.r.sign.next = Wire(self.a.sign)
-        self.q.sign.next = Wire(self.a.sign^self.b.sign)
-class Dividor(VStruct):
-    def __init__(self,reset,req,ack,a,b,sign,io=None,locs=[12,4],**kwargs):
-        VStruct.__init__(self,**kwargs)
-        self.width = len(a)
-        if len(b)!=self.width:raise NotImplementedError()
-
-        self.work = Reg()
-        self.done = Reg()
-        self.ready = Wire(io=io)
-        self.enter = Wire()
-        self.finish = Wire(io=io)
-        self.sloving = Wire()
-        self.leave = Wire()
-        self.leave[:] = self.finish & ack
-        self.ready[:] = self.leave  | ~self.work
-        self.enter[:] = self.ready  & req
-        self.sloving[:] = self.work &~self.done&~self.finish
-
-        
-
-        self.r[:] = self.r.sign.mux(~self.dividend+1,self.dividend)
-        self.q[:] = self.q.sign.mux(~self.partial +1,self.partial )
-
-        When(reset)[self.work:0]\
-        .When(self.ready)[self.work:req]
-
-        When(self.ready)[self.done:req&self.enter.q]
-
-        When(self.enter)[self.phase:self.enter.phase]\
-            [self.buffer:self.enter.val][self.divisor:self.b.abs]\
-            [self.r.sign:self.r.sign.next][self.q.sign:self.q.sign.next]\
-        .When(self.sloving)[self.phase:self.phase.next][self.buffer:self.buffer.next]
-
+        self.update.phase = Wire((phase-1).validif(~self.last))
+        self.update.r = Wire(self.last.mux(self.r.next,self.q[-1]*self.r.next[:-1]))
+        self.update.q = Wire(len(self.q))
+        self.update.q.still = Wire(self.r.ged*self.q[1:])
+        self.update.q.shift = Wire(self.last.mux(self.update.q.still,Binary(0,width=1)*self.update.q.still[:-1]))
+        self.update.q[:] = self.update.q.shift
+        self.present = Wire(self.last&~self.r.ged)
+        self.present.r = Wire(r.sign.mux(-r,r))
+        self.present.q = Wire(q.sign.mux(-q,q))
